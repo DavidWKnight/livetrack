@@ -13,13 +13,12 @@ BANDWIDTH_IDX = 2
 NUM_SAMPLES_IDX = 3
 NUM_IDXS = 4
 
-outputFolder = "collects/"
-
 def closeFile(handle):
     fname = handle.name
     handle.close()
     start = time.time()
-    subprocess.Popen(['gzip', fname, '&&', 'rm', fname])
+    # subprocess.Popen(['gzip', fname, '&&', 'rm', fname])
+    subprocess.Popen(['gzip', fname])
     end = time.time()
 
 
@@ -42,7 +41,7 @@ def run(sdrSettings, updatedSettings, runFlag, inputQueue):
             nextCommand = inputQueue.get()
             print(nextCommand)
             if nextCommand['onoff'] == 'on':
-                recordFiles[nextCommand['icao']] = open(outputFolder + nextCommand['fname'], 'wb')
+                recordFiles[nextCommand['icao']] = open(nextCommand['fname'], 'wb')
             else:
                 if nextCommand['icao'] not in recordFiles:
                     continue
