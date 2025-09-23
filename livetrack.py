@@ -29,11 +29,16 @@ IDX_ALT = 11
 IDX_LAT = 14
 IDX_LON = 15
 
+IDX_GROUND_SPEED = 12
+IDX_TRACK = 13
+IDX_ALT_RATE = 16
+
 class TrackedAircraft():
-    def __init__(self, icao, tLast, fileHandle):
+    def __init__(self, icao, tLast, posFile, velFile):
         self.icao = icao
         self.tLast = tLast
-        self.fileHandle = fileHandle
+        self.posFile = posFile
+        self.velFile = velFile
 
 trackedAircraft = {} # icao : tLast
 aicraftTimeout = 15
@@ -59,7 +64,8 @@ try:
         for icao in aicraftToRemove:
             print(f"{icao} exited")
             pluto.stopRecording(icao)
-            trackedAircraft[icao].fileHandle.close()
+            trackedAircraft[icao].posFile.close()
+            trackedAircraft[icao].velFile.close()
             del trackedAircraft[icao]
 
         # Try parsing next message
@@ -67,16 +73,26 @@ try:
         if not line:  # Empty line indicates end of stream (connection closed)
             break
         line = line.decode('utf-8')
-        if "MSG,3" not in line:
-            continue
         line = line.split(',')
+        icao = line[IDX_ICAO]
+        if line[1] == "4":
+            if icao in trackedAircraft:
+                trackedAircraft[icao].velFile.write(icao)
+                trackedAircraft[icao].velFile.write(", " + now.isoformat())
+                trackedAircraft[icao].velFile.write(", " + line[IDX_GROUND_SPEED])
+                trackedAircraft[icao].velFile.write(", " + line[IDX_TRACK])
+                trackedAircraft[icao].velFile.write(", " + line[IDX_ALT_RATE])
+                trackedAircraft[icao].velFile.write("\n")
+            continue
+        if line[1] != "3":
+            continue
         if line[IDX_LAT] == '':
             continue
         if line[IDX_LON] == '':
             continue
         if line[IDX_ALT] == '':
             continue
-        icao = line[IDX_ICAO]
+
         lat = float(line[IDX_LAT])
         lon = float(line[IDX_LON])
         alt = float(line[IDX_ALT])
@@ -97,18 +113,20 @@ try:
                 fname = outputFolder + now.isoformat(timespec='seconds') + "_" + icao
                 pluto.startRecording(icao, fname + '.dat')
                 
-                aircraftLog = open(fname + '.txt', 'w+')
-                trackedAircraft[icao] = TrackedAircraft(icao, now, aircraftLog)
-                aircraftLog.write("ICAO, Time, Lat, Lon, Alt\n")
+                positionLog = open(fname + '_pos.txt', 'w+')
+                velocityLog = open(fname + '_vel.txt', 'w+')
+                trackedAircraft[icao] = TrackedAircraft(icao, now, positionLog, velocityLog)
+                positionLog.write("ICAO, Time, Lat, Lon, Alt\n")
+                velocityLog.write("ICAO, Time, Ground Speed, Track, Alt Rate\n")
                 print(f"{icao} entered")
             
             trackedAircraft[icao].tLast = now
-            trackedAircraft[icao].fileHandle.write(icao)
-            trackedAircraft[icao].fileHandle.write(", " + now.isoformat())
-            trackedAircraft[icao].fileHandle.write(", " + str(aircraftLLA[0]))
-            trackedAircraft[icao].fileHandle.write(", " + str(aircraftLLA[1]))
-            trackedAircraft[icao].fileHandle.write(", " + str(aircraftLLA[2]))
-            trackedAircraft[icao].fileHandle.write("\n")
+            trackedAircraft[icao].posFile.write(icao)
+            trackedAircraft[icao].posFile.write(", " + now.isoformat())
+            trackedAircraft[icao].posFile.write(", " + str(aircraftLLA[0]))
+            trackedAircraft[icao].posFile.write(", " + str(aircraftLLA[1]))
+            trackedAircraft[icao].posFile.write(", " + str(aircraftLLA[2]))
+            trackedAircraft[icao].posFile.write("\n")
 
 finally:
     pluto.stop()

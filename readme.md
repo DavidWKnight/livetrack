@@ -1,5 +1,7 @@
 source ../pysdr/bin/activate
 
+Flight notes:
+    The B777 flight to/from taipai gets into ONT around 7pm and leaves around 11pm on Monday, Wednesday, Friday, and Saturday
 
 Monitor output directory size:
     watch "ls -la --block-size=M collects/"
