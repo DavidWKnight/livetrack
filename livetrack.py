@@ -6,6 +6,7 @@ import numpy as np
 import pymap3d
 
 from PlutoLogger import PlutoLogger
+from ACState import ACPosition, ACVelocity
 
 outputFolder = "collects/"
 
@@ -22,7 +23,9 @@ socket_file = sock.makefile('rb')
 transmitterLLA = np.array([34.1334345,-117.9070175, 198])
 
 transmitterEl = [40, 60] # Testing values for now
+print("Using fake enter/exit elavations, fix before real collects!")
 
+IDX_MSG_TYPE = 1
 IDX_ICAO = 4
 IDX_CALLSIGN = 5
 IDX_ALT = 11
@@ -32,6 +35,9 @@ IDX_LON = 15
 IDX_GROUND_SPEED = 12
 IDX_TRACK = 13
 IDX_ALT_RATE = 16
+
+SBS_POSITION_MESSAGE = "3"
+SBS_VELOCITY_MESSAGE = "4"
 
 class TrackedAircraft():
     def __init__(self, icao, tLast, posFile, velFile):
@@ -48,12 +54,16 @@ pluto.start()
 
 tLastSleep = datetime.now()
 
+allPosFile = open(outputFolder + "allPos.csv", "a+")
+allVelFile = open(outputFolder + "allVel.csv", "a+")
+
 try:
     while True:
         # Save some cpu
         if (datetime.now() - tLastSleep).total_seconds() > 0.25:
             time.sleep(0.25)
-            pass
+            allPosFile.flush()
+            allVelFile.flush()
 
         # Prune old entries
         aicraftToRemove = []
@@ -70,66 +80,63 @@ try:
 
         # Try parsing next message
         line = socket_file.readline()
+        now = datetime.now()
         if not line:  # Empty line indicates end of stream (connection closed)
             break
         line = line.decode('utf-8')
         line = line.split(',')
-        icao = line[IDX_ICAO]
-        if line[1] == "4":
-            if icao in trackedAircraft:
-                trackedAircraft[icao].velFile.write(icao)
-                trackedAircraft[icao].velFile.write(", " + now.isoformat())
-                trackedAircraft[icao].velFile.write(", " + line[IDX_GROUND_SPEED])
-                trackedAircraft[icao].velFile.write(", " + line[IDX_TRACK])
-                trackedAircraft[icao].velFile.write(", " + line[IDX_ALT_RATE])
-                trackedAircraft[icao].velFile.write("\n")
-            continue
-        if line[1] != "3":
-            continue
-        if line[IDX_LAT] == '':
-            continue
-        if line[IDX_LON] == '':
-            continue
-        if line[IDX_ALT] == '':
+
+        # Handle velocity message
+        if line[IDX_MSG_TYPE] == SBS_VELOCITY_MESSAGE:
+            msg = ACVelocity().fromSBS(line, now)
+            allVelFile.write(msg.toCSVLine())
+            if msg.icao in trackedAircraft:
+                trackedAircraft[msg.icao].velFile.write(msg.toCSVLine())
             continue
 
-        lat = float(line[IDX_LAT])
-        lon = float(line[IDX_LON])
-        alt = float(line[IDX_ALT])
-
-        if np.isclose(lat, 0.0):
+        if line[IDX_MSG_TYPE] != SBS_POSITION_MESSAGE:
             continue
-        if np.isclose(lon, 0.0):
+        
+        # Handle position message
+        try:
+            msg = ACPosition().fromSBS(line, now)
+        except:
             continue
-        if np.isclose(alt, 0.0):
-            continue
-        now = datetime.now()
 
-        aircraftLLA = np.array([lat, lon, alt])
+        allPosFile.write(msg.toCSVLine())
 
-        aircraftAER = pymap3d.geodetic2aer(*aircraftLLA, *transmitterLLA)
+        # Check if aircraft is in the transmitters "FOV"
+        aircraftAER = pymap3d.geodetic2aer(*msg.LLA, *transmitterLLA)
         if aircraftAER[1] > transmitterEl[0] and aircraftAER[1] < transmitterEl[1]:
+            # Check if this is the first time we're seeing this aircraft
+            icao = msg.icao
             if icao not in trackedAircraft:
                 fname = outputFolder + now.isoformat(timespec='seconds') + "_" + icao
                 pluto.startRecording(icao, fname + '.dat')
                 
-                positionLog = open(fname + '_pos.txt', 'w+')
-                velocityLog = open(fname + '_vel.txt', 'w+')
+                positionLog = open(fname + '_pos.csv', 'w+')
+                positionLog.write(ACPosition().getCSVHeader())
+
+                velocityLog = open(fname + '_vel.csv', 'w+')
+                velocityLog.write(ACVelocity().getCSVHeader())
+
                 trackedAircraft[icao] = TrackedAircraft(icao, now, positionLog, velocityLog)
-                positionLog.write("ICAO, Time, Lat, Lon, Alt\n")
-                velocityLog.write("ICAO, Time, Ground Speed, Track, Alt Rate\n")
                 print(f"{icao} entered")
             
             trackedAircraft[icao].tLast = now
-            trackedAircraft[icao].posFile.write(icao)
-            trackedAircraft[icao].posFile.write(", " + now.isoformat())
-            trackedAircraft[icao].posFile.write(", " + str(aircraftLLA[0]))
-            trackedAircraft[icao].posFile.write(", " + str(aircraftLLA[1]))
-            trackedAircraft[icao].posFile.write(", " + str(aircraftLLA[2]))
-            trackedAircraft[icao].posFile.write("\n")
+            trackedAircraft[icao].posFile.write(msg.toCSVLine())
+        else:
+            print(aircraftAER[1])
 
 finally:
     pluto.stop()
+
+    allPosFile.close()
+    allVelFile.close()
+
+    for aircraft in trackedAircraft.values():
+        aircraft.posFile.close()
+        aircraft.velFile.close()
 
     # Close the file-like object and the socket
     socket_file.close()
