@@ -1,6 +1,7 @@
 collects/
 
 # Byte-compiled / optimized / DLL files
+adi/__pycache__/
 __pycache__/
 *.py[codz]
 *$py.class
