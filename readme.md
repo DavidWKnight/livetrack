@@ -20,3 +20,7 @@ Receive SBS1 messages from dump1090, parse for airborn position messages, when s
 No viewer at all besides dump1090.
 
 
+ffmpeg draw frame number over video:
+    ffmpeg -i PXL_20250920_180111400.TS.mp4 -vf "drawtext=fontfile=Arial.ttf: text=%{n}: x=(w-tw)/2: y=h-(2*lh): fontcolor=white: fontsize=72:  box=1: boxcolor=0x00000099"     output.mov
+
+    Good for validating actual rotation rate of transmitter
