@@ -103,7 +103,8 @@ try:
         except Exception as e:
             print(f"Bad position message! {e} - {line}")
             continue
-
+        icao = msg.icao
+        
         allPosFile.write(msg.toCSVLine())
 
         # Check if aircraft is in the transmitters "FOV"
@@ -114,7 +115,6 @@ try:
         # 20km before/after the runway, +- 3 km north/south of the runway, and <5000 feet
         if abs(aircraftENU[0]) < 20e3 and abs(aircraftENU[1]) < 3e3 and aircraftENU[2] < 5000*0.3048:
             # Check if this is the first time we're seeing this aircraft
-            icao = msg.icao
             if icao not in trackedAircraft:
                 fname = outputFolder + now.isoformat(timespec='seconds') + "_" + icao
                 pluto.startRecording(icao, fname + '.dat')
