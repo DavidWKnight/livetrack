@@ -1,9 +1,11 @@
 import time
 import gzip
+import struct
 import subprocess
 from datetime import datetime
 from multiprocessing import Process, Queue, Array, Event
 
+import numpy as np
 import matplotlib.pyplot as plt
 import adi
 
@@ -42,6 +44,12 @@ def run(sdrSettings, updatedSettings, runFlag, inputQueue):
             print(nextCommand)
             if nextCommand['onoff'] == 'on':
                 recordFiles[nextCommand['icao']] = open(nextCommand['fname'], 'wb')
+                
+                # Write header
+                recordFiles[nextCommand['icao']].write(struct.pack("!f", sdrSettings[CENTER_FREQ_IDX]))
+                recordFiles[nextCommand['icao']].write(struct.pack("!f", sdrSettings[SAMPLE_RATE_IDX]))
+                recordFiles[nextCommand['icao']].write(struct.pack("!f", sdrSettings[BANDWIDTH_IDX]))
+                recordFiles[nextCommand['icao']].write(struct.pack("!f", sdrSettings[NUM_SAMPLES_IDX]))
             else:
                 if nextCommand['icao'] not in recordFiles:
                     continue
@@ -53,9 +61,10 @@ def run(sdrSettings, updatedSettings, runFlag, inputQueue):
         else:
             start = time.time()
             frame = sdr.rx()
+            end = time.time()
+
             for handle in recordFiles.values():
                 handle.write(frame.tobytes())
-            end = time.time()
     # Close all archives
     for handle in recordFiles.values():
         closeFile(handle)
@@ -66,10 +75,10 @@ class PlutoLogger():
         self.recordingICAOs = []
 
         self.sdrSettings = Array('f', range(NUM_IDXS))
-        self.sdrSettings[SAMPLE_RATE_IDX] = 1e6 # Hz
+        self.sdrSettings[SAMPLE_RATE_IDX] = 1e6*.75 # Hz
         self.sdrSettings[CENTER_FREQ_IDX] = 2.897028e9 # Hz
-        self.sdrSettings[NUM_SAMPLES_IDX] = 4096 * 8
-        self.sdrSettings[BANDWIDTH_IDX] = 2e6
+        self.sdrSettings[NUM_SAMPLES_IDX] = 2**20
+        self.sdrSettings[BANDWIDTH_IDX] = 0.5e6
         
         self.updatedSettings = Event()
         self.runFlag = Event()
