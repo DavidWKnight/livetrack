@@ -31,22 +31,26 @@ class ACPosition:
         if line[IDX_MSG_TYPE] != SBS_POSITION_MESSAGE:
             raise ValueError("Not a position message!")
         if line[IDX_LAT] == '':
-            raise ValueError()
+            raise ValueError("Bad lat " + line[IDX_LAT])
         if line[IDX_LON] == '':
-            raise ValueError()
+            raise ValueError("Bad lon " + line[IDX_LAT])
         if line[IDX_ALT] == '':
-            raise ValueError()
+            raise ValueError("Bad alt " + line[IDX_LAT])
 
         lat = float(line[IDX_LAT])
         lon = float(line[IDX_LON])
         alt = float(line[IDX_ALT])
 
+        # According to google AI thing
+        localPressure = 30.05 # 9_28 @ 10:30am
+        altMSL = alt + (localPressure - 29.92)*1000
+
         if np.isclose(lat, 0.0):
-            raise ValueError()
+            raise ValueError("Lat near 0")
         if np.isclose(lon, 0.0):
-            raise ValueError()
+            raise ValueError("Lon near 0")
         if np.isclose(alt, 0.0):
-            raise ValueError()
+            raise ValueError("Alt near 0")
 
         self.icao = line[IDX_ICAO]
         self.t = t
