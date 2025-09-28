@@ -39,11 +39,11 @@ class ACPosition:
 
         lat = float(line[IDX_LAT])
         lon = float(line[IDX_LON])
-        alt = float(line[IDX_ALT])
+        alt = float(line[IDX_ALT]) * 0.3048
 
         # According to google AI thing
         localPressure = 30.05 # 9_28 @ 10:30am
-        altMSL = alt + (localPressure - 29.92)*1000
+        altMSL = float(line[IDX_ALT]) + (localPressure - 29.92)*1000
 
         if np.isclose(lat, 0.0):
             raise ValueError("Lat near 0")
