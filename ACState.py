@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import List
 
 import numpy as np
+import pymap3d
 
 IDX_MSG_TYPE = 1
 IDX_ICAO = 4
@@ -16,6 +17,20 @@ IDX_ALT_RATE = 16
 
 SBS_POSITION_MESSAGE = "3"
 SBS_VELOCITY_MESSAGE = "4"
+
+def lerp(a, b, t):
+  """
+  Performs linear interpolation between two values.
+
+  Args:
+    a (float): The starting value.
+    b (float): The ending value.
+    t (float): The interpolation amount, typically between 0.0 and 1.0.
+
+  Returns:
+    float: The interpolated value.
+  """
+  return a + (b - a) * t
 
 class ACPosition:
     icao: str
@@ -70,6 +85,22 @@ class ACPosition:
         line += "\n"
         return line
 
+    def lerp(self, other, t):
+        # Only valid if 
+
+        icao = self.icao
+        dt = (other.t - self.t).total_seconds()
+        tLerp = (t - self.t).total_seconds()
+        if dt > 60:
+            return None # This is a terrible approximation
+
+        a = np.array(pymap3d.geodetic2ecef(*self.LLA))
+        b = np.array(pymap3d.geodetic2ecef(*other.LLA))
+        x = tLerp / dt
+        c = lerp(a, b, x)
+        pos = np.array(pymap3d.ecef2geodetic(*c))
+        return ACPosition(icao, t, pos)
+
 class ACVelocity:
     icao: str
     t: datetime
@@ -119,18 +150,22 @@ class ACState:
         self.positions = positions
         self.velocities = velocities
 
-    def parseFromDecoder(self, acs) -> None:        
-        t = datetime.fromtimestamp(acs['t'])
-        pos = ACPosition(t, np.array([acs['lat'], acs['lon'], acs['alt']]))
-        self.positions.append(pos)
-        if acs['alt'] is not None and acs['gs'] is not None and acs['trk'] is not None:
-            vel = ACVelocity(t, acs['alt'], acs['gs'], acs['trk'])
-            self.velocities.append(vel)
-        
-
-
     def getPosition(self, t: datetime) -> np.array:
-        pass
+        # Find the first recording that is after the requested time
+        t2Idx = -1
+        for idx, pos in enumerate(self.positions):
+            if t < pos.t:
+                t2Idx = idx
+                break
+
+        t1Idx = t2Idx - 1
+        if t2Idx < 0:
+            return None # Requested time is after this collect
+        if t1Idx < 0:
+            return None # Requested time is before this collect
+        
+        out = self.positions[t1Idx].lerp(self.positions[t2Idx], t)
+        return out.LLA
 
     def getVelocity(self, t: datetime) -> np.array:
         pass
