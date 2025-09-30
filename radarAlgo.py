@@ -2,7 +2,7 @@ import numpy as np
 from scipy import ndimage
 import matplotlib.pyplot as plt
 
-ASR11_SCAN_RATE = 4.8 # Seconds per revolution
+ASR11_SCAN_RATE = 4.6 # Seconds per revolution
 ASR11_PULSE_RATE = 1e-3 # Seconds
 ASR11_PULSE_WIDTH = 1e-6 # Seconds
 
@@ -12,11 +12,11 @@ def chunks(lst, n):
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
 
-def maxPool1d(data, stride):
+def maxPool1d(data: np.ndarray, stride: int) -> np.ndarray:
     """Downsample by taking the max of neighbors"""
     return np.array([max(chunk) for chunk in chunks(data, stride)])
 
-def findDirectPathPulses(data, sampleRate, resolution=1, plot=False):
+def findDirectPathPulses(data: np.ndarray, sampleRate: float, resolution=1, plot: bool=False):
     """
     Find the pulse centers
     
@@ -81,7 +81,7 @@ def findDirectPathPulses(data, sampleRate, resolution=1, plot=False):
 
     return np.array(centers), np.array(centerIndexes)
 
-def findPulseTime(data, sampleRate, resolution=1, plot=False):# 
+def findPulseTime(data: np.ndarray, sampleRate: float, resolution: int=1, plot: bool=False):# 
     """
     Find the center time of several ASR11 pulses
     """
@@ -95,3 +95,27 @@ def findPulseTime(data, sampleRate, resolution=1, plot=False):#
         plt.scatter(idx, data[idx])
         plt.show()
     return idx / sampleRate, idx
+
+def matchFilter(data: np.ndarray, sampleRate: float) -> np.ndarray:
+    matchLenth = int(np.ceil(sampleRate * ASR11_PULSE_WIDTH))
+    kernel = np.ones(matchLenth)
+    return np.convolve(data, kernel, 'valid')
+
+def pulseIntegration(data: np.ndarray, sampleRate: float, numIntegrations: int=10) -> np.ndarray:
+    fastFrameSampleSize = int(sampleRate/1000)
+    fastFrames = chunks(data, fastFrameSampleSize)
+    runningSum = [[0]*fastFrameSampleSize]*numIntegrations
+
+    circBufferIdx = 0
+    output = []
+    for frame in fastFrames:
+        if len(frame) != fastFrameSampleSize:
+            output.extend(frame) # Likely the last samples in the collect
+            continue
+
+        runningSum[circBufferIdx] = frame
+        output.extend(np.sum(runningSum, 0))
+        circBufferIdx = (circBufferIdx + 1) % numIntegrations
+
+    return output
+
