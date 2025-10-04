@@ -13,7 +13,13 @@ CENTER_FREQ_IDX = 0
 SAMPLE_RATE_IDX = 1
 BANDWIDTH_IDX = 2
 NUM_SAMPLES_IDX = 3
-NUM_IDXS = 4
+DTYPE_IDX = 4
+NUM_IDXS = 5
+
+FLOAT32 = 1
+FLOAT64 = 2
+INT16 = 3
+
 
 def closeFile(handle):
     fname = handle.name
@@ -31,6 +37,12 @@ def run(sdrSettings, updatedSettings, runFlag, inputQueue):
     sdr.gain_control_mode_chan0 = 'manual'
     sdr.rx_hardwaregain_chan0 = 60.0 # dB
 
+    dtype = 'float64'
+    if sdrSettings[DTYPE_IDX] == FLOAT32:
+        dtype = 'float32'
+    elif sdrSettings[DTYPE_IDX] == INT16:
+        dtype = 'int16'
+
     while (runFlag.is_set()):
         if updatedSettings.is_set():
             sdr.rx_lo = int(sdrSettings[CENTER_FREQ_IDX])
@@ -44,12 +56,6 @@ def run(sdrSettings, updatedSettings, runFlag, inputQueue):
             print(nextCommand)
             if nextCommand['onoff'] == 'on':
                 recordFiles[nextCommand['icao']] = open(nextCommand['fname'], 'wb')
-                
-                # Write header
-                recordFiles[nextCommand['icao']].write(struct.pack("!f", sdrSettings[CENTER_FREQ_IDX]))
-                recordFiles[nextCommand['icao']].write(struct.pack("!f", sdrSettings[SAMPLE_RATE_IDX]))
-                recordFiles[nextCommand['icao']].write(struct.pack("!f", sdrSettings[BANDWIDTH_IDX]))
-                recordFiles[nextCommand['icao']].write(struct.pack("!f", sdrSettings[NUM_SAMPLES_IDX]))
             else:
                 if nextCommand['icao'] not in recordFiles:
                     continue
@@ -62,6 +68,7 @@ def run(sdrSettings, updatedSettings, runFlag, inputQueue):
             start = time.time()
             frame = sdr.rx()
             end = time.time()
+            frame = frame.astype(dtype)
 
             for handle in recordFiles.values():
                 handle.write(frame.tobytes())
@@ -71,15 +78,21 @@ def run(sdrSettings, updatedSettings, runFlag, inputQueue):
 
 
 class PlutoLogger():
-    def __init__(self):
+    def __init__(self, sampleRate, centerFreq, numSamples, bandwidth, dtype):
         self.recordingICAOs = []
 
         self.sdrSettings = Array('f', range(NUM_IDXS))
-        self.sdrSettings[SAMPLE_RATE_IDX] = 1e6*.75 # Hz
-        self.sdrSettings[CENTER_FREQ_IDX] = 2.897028e9 # Hz
-        self.sdrSettings[NUM_SAMPLES_IDX] = 2**20
-        self.sdrSettings[BANDWIDTH_IDX] = 0.5e6
-        
+        self.sdrSettings[SAMPLE_RATE_IDX] = sampleRate # Hz
+        self.sdrSettings[CENTER_FREQ_IDX] = centerFreq # Hz
+        self.sdrSettings[NUM_SAMPLES_IDX] = numSamples
+        self.sdrSettings[BANDWIDTH_IDX] = bandwidth
+        if dtype == 'float32':
+            self.sdrSettings[DTYPE_IDX] = FLOAT32
+        elif dtype == 'float64':
+            self.sdrSettings[DTYPE_IDX] = FLOAT64
+        elif dtype == 'int16':
+            self.sdrSettings[DTYPE_IDX] = INT16
+
         self.updatedSettings = Event()
         self.runFlag = Event()
         self.inputQueue = Queue()

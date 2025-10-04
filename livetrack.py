@@ -1,4 +1,5 @@
 import time
+import json
 import socket
 from datetime import datetime
 
@@ -19,8 +20,19 @@ sock.connect(server_address)
 
 socket_file = sock.makefile('rb')
 
+SETTINGS = {
+    # "transmitterLLA": [34.052724, -117.596634, 0],
+    "transmitterLLA": [34.1334345,-117.9070175, 198],
+    "receiverLLA": [34.051555, -117.593415, 0],
+    "sampleRate": 3e6, # Hz
+    "centerFreq": 2.897028e9, # Hz
+    "numSamples": 2**20,
+    "bandwidth": 0.5e6,
+    "rfDtype": 'float32'
+}
+
 # transmitterLLA = np.array([34.052724, -117.596634, 0])
-transmitterLLA = np.array([34.1334345,-117.9070175, 198])
+transmitterLLA = np.array(np.array(SETTINGS['transmitterLLA']))
 
 transmitterEl = [40, 60] # Testing values for now
 print("Using fake enter/exit elavations, fix before real collects!")
@@ -49,7 +61,7 @@ class TrackedAircraft():
 trackedAircraft = {} # icao : tLast
 aicraftTimeout = 15
 
-pluto = PlutoLogger()
+pluto = PlutoLogger(SETTINGS["sampleRate"], SETTINGS["centerFreq"], SETTINGS["numSamples"], SETTINGS["bandwidth"], SETTINGS["rfDtype"])
 pluto.start()
 
 tLastSleep = datetime.now()
@@ -113,12 +125,17 @@ try:
 
         aircraftENU = pymap3d.geodetic2enu(*msg.LLA, *transmitterLLA)
         # 20km before/after the runway, +- 3 km north/south of the runway, and <5000 feet
-        if abs(aircraftENU[0]) < 20e3 and abs(aircraftENU[1]) < 3e3 and aircraftENU[2] < 5000*0.3048:
+        if abs(aircraftENU[0]) < 20e3 and abs(aircraftENU[1]) < 6e3 and aircraftENU[2] < 5000*0.3048:
             # Check if this is the first time we're seeing this aircraft
             if icao not in trackedAircraft:
                 fname = outputFolder + now.isoformat(timespec='seconds') + "_" + icao
                 pluto.startRecording(icao, fname + '.dat')
                 
+                with open(fname + "_state.json", 'w+') as stateFile:
+                    state = SETTINGS
+                    state['tStart'] = now.isoformat(timespec='seconds')
+                    json.dump(state, stateFile)
+
                 positionLog = open(fname + '_pos.csv', 'w+')
                 positionLog.write(ACPosition().getCSVHeader())
 
