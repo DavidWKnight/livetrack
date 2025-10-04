@@ -1,7 +1,7 @@
 import csv
 import glob
 import gzip
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 import numpy as np
@@ -51,7 +51,7 @@ def loadPos(fname) -> List[ACPosition]:
         for line in posData:
             line = removeLineSpaces(line)
             icao = line[icaoIdx]
-            t = datetime.fromisoformat(line[tIdx])
+            t = datetime.fromisoformat(line[tIdx]) - timedelta(seconds=0.1)
             lla = np.array([float(line[latIdx]), float(line[lonIdx]), float(line[altIdx])])
             pos.append(ACPosition(icao, t, lla))
         return pos

@@ -150,7 +150,7 @@ class ACState:
         self.positions = positions
         self.velocities = velocities
 
-    def getPosition(self, t: datetime) -> np.array:
+    def getPosition(self, t: datetime, extrap: bool=False) -> np.array:
         # Find the first recording that is after the requested time
         t2Idx = -1
         for idx, pos in enumerate(self.positions):
@@ -160,8 +160,14 @@ class ACState:
 
         t1Idx = t2Idx - 1
         if t2Idx < 0:
+            if extrap:
+                out = self.positions[-2].lerp(self.positions[-1], t)
+                return out.LLA # If you really do want it
             return None # Requested time is after this collect
         if t1Idx < 0:
+            if extrap:
+                out = self.positions[0].lerp(self.positions[1], t)
+                return out.LLA # If you really do want it
             return None # Requested time is before this collect
         
         out = self.positions[t1Idx].lerp(self.positions[t2Idx], t)
