@@ -33,6 +33,7 @@ SETTINGS = {
 
 # transmitterLLA = np.array([34.052724, -117.596634, 0])
 transmitterLLA = np.array(np.array(SETTINGS['transmitterLLA']))
+receiverLLA = np.array(np.array(SETTINGS['receiverLLA']))
 
 transmitterEl = [40, 60] # Testing values for now
 print("Using fake enter/exit elavations, fix before real collects!")
@@ -119,13 +120,18 @@ try:
         
         allPosFile.write(msg.toCSVLine())
 
-        # Check if aircraft is in the transmitters "FOV"
-        # aircraftAER = pymap3d.geodetic2aer(*msg.LLA, *transmitterLLA)
-        # if aircraftAER[1] > transmitterEl[0] and aircraftAER[1] < transmitterEl[1]:
-
         aircraftENU = pymap3d.geodetic2enu(*msg.LLA, *transmitterLLA)
-        # 20km before/after the runway, +- 3 km north/south of the runway, and <5000 feet
-        if abs(aircraftENU[0]) < 20e3 and abs(aircraftENU[1]) < 6e3 and aircraftENU[2] < 5000*0.3048:
+        
+        lowAlt = aircraftENU[2] < 5000*0.3048
+        eastOfRunway = aircraftENU[0] < 20e3 and aircraftENU[0] > 0
+        westOfRunway = aircraftENU[0] < 0 and aircraftENU[0] > -20e3
+        onApproach = eastOfRunway and lowAlt and abs(aircraftENU[1]) < 3e3
+        onTakeoff = westOfRunway and lowAlt and abs(aircraftENU[1]) < 6e3 # Aircraft rapidly turn after takeoff
+
+        aircraftFromObserverENU = pymap3d.geodetic2enu(*msg.LLA, *receiverLLA)
+        nearReceiver = np.linalg.norm(aircraftFromObserverENU) < 10e3
+
+        if onApproach or onTakeoff or nearReceiver:
             # Check if this is the first time we're seeing this aircraft
             if icao not in trackedAircraft:
                 fname = outputFolder + now.isoformat(timespec='seconds') + "_" + icao
