@@ -131,7 +131,7 @@ try:
                 fname = outputFolder + now.isoformat(timespec='seconds') + "_" + icao
                 pluto.startRecording(icao, fname + '.dat')
                 
-                with open(fname + "_state.json", 'w+') as stateFile:
+                with open(fname + "_settings.json", 'w+') as stateFile:
                     state = SETTINGS
                     state['tStart'] = now.isoformat(timespec='seconds')
                     json.dump(state, stateFile)
