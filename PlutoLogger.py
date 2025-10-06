@@ -37,11 +37,7 @@ def run(sdrSettings, updatedSettings, runFlag, inputQueue):
     sdr.gain_control_mode_chan0 = 'manual'
     sdr.rx_hardwaregain_chan0 = 60.0 # dB
 
-    dtype = 'float64'
-    if sdrSettings[DTYPE_IDX] == FLOAT32:
-        dtype = 'float32'
-    elif sdrSettings[DTYPE_IDX] == INT16:
-        dtype = 'int16'
+    tStart = time.time()
 
     while (runFlag.is_set()):
         if updatedSettings.is_set():
@@ -65,13 +61,24 @@ def run(sdrSettings, updatedSettings, runFlag, inputQueue):
         if len(recordFiles) == 0:
             time.sleep(0.25) # Nothing to record, we can sleep
         else:
-            start = time.time()
+            tEnd = time.time()
+            print(f"Loop time  = {tEnd - tStart}")
             frame = sdr.rx()
-            end = time.time()
-            frame = frame.astype(dtype)
+            tStart = time.time()
+
+            # Convert input complex array to array of int 16's
+            data = frame.view(np.float64)
+            if np.max(data) > 32767 or np.min(data) < -32768:
+                print(f"Warning! RF data exceeds range of int16!")
+            if np.max(data) > 255 or np.min(data) < -256:
+                print(f"FYI: RF data exceeds range of int8")
+
+            data = data.astype(np.int16)
+            data = data.tobytes()
 
             for handle in recordFiles.values():
-                handle.write(frame.tobytes())
+                handle.write(data)
+
     # Close all archives
     for handle in recordFiles.values():
         closeFile(handle)

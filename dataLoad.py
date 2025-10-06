@@ -24,7 +24,8 @@ def loadRF(fname) -> np.ndarray:
     if rfFile.endswith('.gz'):
         with gzip.open(rfFile, 'rb') as file:
             a = file.read()
-            data = np.frombuffer(a, np.float64)
+            data = np.frombuffer(a, np.int16)
+            data = data[::2] + 1j * data[1::2]
             return data
     elif rfFile.endswith('.dat'):
         data = np.fromfile(rfFile)
