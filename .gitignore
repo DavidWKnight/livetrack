@@ -1,4 +1,4 @@
-collects/
+collects*/
 
 # Byte-compiled / optimized / DLL files
 adi/__pycache__/
