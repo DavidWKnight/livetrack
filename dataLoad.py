@@ -13,15 +13,15 @@ def loadCollect(fname):
     return (loadACState(fname), loadSettings(fname), loadRF(fname))
 
 def loadACState(fname):
-    posFile = glob.glob(fname + '_pos.csv')[0]
-    velFile = glob.glob(fname + '_vel.csv')[0]
+    posFile = glob.glob(fname + '_pos.csv', recursive=True)[0]
+    velFile = glob.glob(fname + '_vel.csv', recursive=True)[0]
     pos = loadPos(posFile)
     vel = loadVel(velFile)
     state = ACState(pos[0].icao, pos, vel)
     return state
 
 def loadRF(fname) -> np.ndarray:
-    rfFile = glob.glob(fname + '.dat*')[0]
+    rfFile = glob.glob(fname + '.dat*', recursive=True)[0]
     if rfFile.endswith('.gz'):
         with gzip.open(rfFile, 'rb') as file:
             a = file.read()
@@ -63,7 +63,7 @@ def loadVel(fname) -> List[ACVelocity]:
     return []
 
 def loadSettings(fname) -> dict:
-    settingsFile = glob.glob(fname + '_settings.json')[0]
+    settingsFile = glob.glob(fname + '_settings.json', recursive=True)[0]
     with open(settingsFile, 'r') as inFile:
         settings = json.load(inFile)
     

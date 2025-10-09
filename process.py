@@ -8,8 +8,7 @@ from rfTypes import collect2scans
 def lin2db(x):
     return 20 * np.log10(x)
 
-folder = '/media/david/Ext/Collects/collects_10_6/collects2/'
-# folder = '/media/david/Ext/Collects/collect_9_28/collects5/'
+folder = '/media/david/Ext/Collects/**/'
 # fnameBase = '2025-10-04T12:08:50_ABC504'
 # fnameBase = '2025-09-28T17:06:03_A3AA32'
 fnameBase = '2025-10-06T17:26:46_AC98AC'
