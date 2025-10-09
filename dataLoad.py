@@ -1,6 +1,7 @@
 import csv
 import glob
 import gzip
+import json
 from datetime import datetime, timedelta
 from typing import List
 
@@ -9,7 +10,7 @@ import numpy as np
 from ACState import ACPosition, ACVelocity, ACState
 
 def loadCollect(fname):
-    return (loadACState(fname), loadRF(fname))
+    return (loadACState(fname), loadSettings(fname), loadRF(fname))
 
 def loadACState(fname):
     posFile = glob.glob(fname + '_pos.csv')[0]
@@ -60,3 +61,11 @@ def loadPos(fname) -> List[ACPosition]:
 
 def loadVel(fname) -> List[ACVelocity]:
     return []
+
+def loadSettings(fname) -> dict:
+    settingsFile = glob.glob(fname + '_settings.json')[0]
+    with open(settingsFile, 'r') as inFile:
+        settings = json.load(inFile)
+    
+    settings['tStart'] = datetime.fromisoformat(settings['tStart'])
+    return settings
