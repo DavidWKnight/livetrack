@@ -1,3 +1,5 @@
+import gc
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -21,6 +23,7 @@ def amplitudeSpectrogramPlot(scan: Scan, settings, show=True):
     timeSeriesPlot.set_title('Time vs Amplitude')
     timeSeriesPlot.set_xlabel('Time (seconds)')
     timeSeriesPlot.set_ylabel('Amplitude (dB)')
+    # timeSeriesPlot.legend()
 
     fftSize = 1024
     spectrogramPlot.specgram(scan.getMag(), Fs=settings['sampleRate'], NFFT=fftSize, noverlap=int(fftSize/2))
@@ -28,6 +31,8 @@ def amplitudeSpectrogramPlot(scan: Scan, settings, show=True):
     spectrogramPlot.set_ylabel('Frequency (Hz)')
     if show:
         plt.show()
+        gc.collect() # plots don't release memory on their own for some reason
+    
 
 def amplitudePlot(scan: Scan, settings, show=True):
     data = lin2db(scan.getMag())
@@ -41,3 +46,5 @@ def amplitudePlot(scan: Scan, settings, show=True):
     plt.ylabel('Amplitude (dB)')
     if show:
         plt.show()
+        gc.collect() # plots don't release memory on their own for some reason
+    

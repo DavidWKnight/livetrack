@@ -18,12 +18,17 @@ fnameBase = '2025-10-06T17:26:46_AC98AC'
 
 aircraftState, settings, RFDataManager = dataLoad.loadCollect(folder + fnameBase)
 
-previousScan = RFDataManager.getNextScan()
-previousScan.appendTarget(aircraftState)
 
 while not RFDataManager.isEndOfFile():
     scan = RFDataManager.getNextScan()
     scan.appendTarget(aircraftState)
     amplitudeSpectrogramPlot(scan, settings)
-    # amplitudePlot(previousScan, settings, False)
-    # amplitudePlot(scan, settings)
+
+# previousScan = RFDataManager.getNextScan()
+# previousScan.appendTarget(aircraftState)
+# while not RFDataManager.isEndOfFile():
+#     scan = RFDataManager.getNextScan()
+#     scan.appendTarget(aircraftState)
+#     amplitudePlot(previousScan, settings, False)
+#     amplitudePlot(scan, settings)
+
