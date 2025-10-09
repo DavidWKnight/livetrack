@@ -41,7 +41,7 @@ class Scan():
         recieverAER = pymap3d.geodetic2aer(*receiverLLA, *transmitterLLA)
         
         tDet = 0 # Initial guess
-        nIterations = 2
+        nIterations = 3
 
         collectStart = self.settings['tStart']
 
@@ -66,6 +66,9 @@ class Scan():
         idxs = np.array(range(0, len(self.data)))
         tValues = self.tStart + (idxs/sampleRate)
         return tValues
+
+    def getMag(self) -> np.ndarray:
+        return np.absolute(self.data)
 
 
 def collect2scans(data: np.ndarray, settings) -> List[Scan]:

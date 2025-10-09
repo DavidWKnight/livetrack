@@ -3,10 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import dataLoad
-from rfTypes import collect2scans
+
+from plotData import amplitudeSpectrogramPlot
+from plotData import amplitudePlot
 
 def lin2db(x):
-    return 20 * np.log10(x)
+    return 20 * np.log10(x + np.finfo(float).eps)
 
 folder = '/media/david/Ext/Collects/**/'
 # fnameBase = '2025-10-04T12:08:50_ABC504'
@@ -14,16 +16,14 @@ folder = '/media/david/Ext/Collects/**/'
 fnameBase = '2025-10-06T17:26:46_AC98AC'
 # fnameBase = '2025-09-28T17:17:35_A420AF'
 
-aircraftState, settings, data = dataLoad.loadCollect(folder + fnameBase)
-data = np.absolute(data)
+aircraftState, settings, RFDataManager = dataLoad.loadCollect(folder + fnameBase)
 
-scans = collect2scans(data, settings)
+previousScan = RFDataManager.getNextScan()
+previousScan.appendTarget(aircraftState)
 
-for scan in scans:
+while not RFDataManager.isEndOfFile():
+    scan = RFDataManager.getNextScan()
     scan.appendTarget(aircraftState)
-
-for scan in scans:
-    plt.plot(scan.getDataTimes() - scan.tStart, lin2db(scan.data))
-    for tDet in scan.targetTimes:
-        plt.axvline(tDet - scan.tStart,  color='r', linestyle='--')
-    plt.show()
+    amplitudeSpectrogramPlot(scan, settings)
+    # amplitudePlot(previousScan, settings, False)
+    # amplitudePlot(scan, settings)

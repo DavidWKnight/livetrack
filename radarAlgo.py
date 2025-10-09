@@ -143,6 +143,7 @@ def findPulseTime(data: np.ndarray, sampleRate: float, resolution: int=1, plot: 
     """
     # This could probably be smarter by doing a weighted center of mass based on each pulse
     # But this should be good enough for now
+    # Center does not need to align with a pulse since it's actually unlikely that the antenna was pointed directly at the pulse time
 
     idx = np.argmax(data)
 
