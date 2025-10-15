@@ -18,17 +18,35 @@ fnameBase = '2025-10-06T17:26:46_AC98AC'
 
 aircraftState, settings, RFDataManager = dataLoad.loadCollect(folder + fnameBase)
 
+# previous = RFDataManager.getNextScan()
+# while not RFDataManager.isEndOfFile():
+#     scan = RFDataManager.getNextScan()
+#     scan.appendTarget(aircraftState)
+    
+#     pulseLines, threshold = scan.getFramesTimes()
+#     plt.plot(np.diff(pulseLines))
+#     plt.show()
+
+#     plt.hist(np.diff(pulseLines), np.arange(0.6e-3, 1.1e-3, 1e-6))
+#     plt.show()
+
+#     # scan.getClutterSuppressedMag()
+
+#     amplitudePlot(scan, settings, False)
+#     # amplitudePlot(scan.applyPulseIntegration(), settings, False)
+#     # amplitudePlot(previous, settings, False)
+#     plt.show()
+
+#     previous = scan
 
 while not RFDataManager.isEndOfFile():
     scan = RFDataManager.getNextScan()
     scan.appendTarget(aircraftState)
-    amplitudeSpectrogramPlot(scan, settings)
-
-# previousScan = RFDataManager.getNextScan()
-# previousScan.appendTarget(aircraftState)
-# while not RFDataManager.isEndOfFile():
-#     scan = RFDataManager.getNextScan()
-#     scan.appendTarget(aircraftState)
-#     amplitudePlot(previousScan, settings, False)
-#     amplitudePlot(scan, settings)
+    frames = scan.toFrames()
+    print(len(frames))
+    returns = frames[1000].getReturns()
+    for r in returns:
+        print(r)
+    input('Hello')
+    amplitudeSpectrogramPlot(scan.applyPulseIntegration(), settings)
 

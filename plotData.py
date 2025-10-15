@@ -15,11 +15,19 @@ def amplitudeSpectrogramPlot(scan: Scan, settings, show=True):
     spectrogramPlot = axes[1]
 
     data = lin2db(scan.getMag())
+    # data = lin2db(scan.getClutterSuppressedMag())
+    
     data = np.clip(data, np.median(data), np.inf) # Clip bottom to the noise floor
     timeSeriesPlot.plot(scan.getDataTimes() - scan.tStart, data)
     for tDet in scan.targetTimes:
         timeSeriesPlot.axvline(tDet - scan.tStart, color='r', linestyle='--')
     
+    # pulseLines = np.arange(0, scan.getLength(), 1e-3)
+    pulseLines, threshold = scan.getFramesTimesCorrected()
+    for line in pulseLines:
+        timeSeriesPlot.axvline(line, color='gray', linestyle='--')
+    timeSeriesPlot.axhline(lin2db(threshold), color='blue')
+
     timeSeriesPlot.set_title('Time vs Amplitude')
     timeSeriesPlot.set_xlabel('Time (seconds)')
     timeSeriesPlot.set_ylabel('Amplitude (dB)')
@@ -40,7 +48,7 @@ def amplitudePlot(scan: Scan, settings, show=True):
     plt.plot(scan.getDataTimes() - scan.tStart, data)
     for tDet in scan.targetTimes:
         plt.axvline(tDet - scan.tStart, color='r', linestyle='--')
-    
+
     plt.title('Time vs Amplitude')
     plt.xlabel('Time (seconds)')
     plt.ylabel('Amplitude (dB)')

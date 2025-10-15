@@ -1,6 +1,8 @@
 import numpy as np
 from scipy import ndimage
 import matplotlib.pyplot as plt
+import pymap3d
+import scipy
 
 ASR11_SCAN_RATE = 4.6 # Seconds per revolution
 ASR11_PULSE_RATE = 1e-3 # Seconds
@@ -145,13 +147,24 @@ def findPulseTime(data: np.ndarray, sampleRate: float, resolution: int=1, plot: 
     # But this should be good enough for now
     # Center does not need to align with a pulse since it's actually unlikely that the antenna was pointed directly at the pulse time
 
+    threshold = np.percentile(data, 99.98)
+    mask = data > threshold
+    mask = ndimage.binary_dilation(mask, [True, True, True, True, True])
+    clusters, numClusters = ndimage.label(mask)
+    centers = np.array([c[0] for c in ndimage.center_of_mass(data, clusters, range(1,numClusters+1))])
+    intensities = data[np.uint64(np.round(centers))]
+    weightedCenter = int(round(np.sum(intensities*centers) / np.sum(intensities)))
+
     idx = np.argmax(data)
 
-    if plot:
+    if False:
         plt.plot(data)
-        plt.scatter(idx, data[idx])
+        plt.scatter(centers, intensities)
+        plt.axvline(weightedCenter, color='red')
+        plt.axvline(idx, color='green')
+        plt.axhline(threshold)
         plt.show()
-    return idx / sampleRate, idx
+    return weightedCenter / sampleRate, weightedCenter
 
 def matchFilter(data: np.ndarray, sampleRate: float) -> np.ndarray:
     matchLenth = int(np.ceil(sampleRate * ASR11_PULSE_WIDTH))
@@ -191,7 +204,54 @@ def pulseIntegration(data: np.ndarray, sampleRate: float, numIntegrations: int=1
 #         output.extend(np.array(frame) - np.array(previousFrame))
 #     return output
 
-def CFAR(data: np.ndarray, sampleRate: float, gapCells: int, referenceCells: int, bias: float):
-    # https://www.youtube.com/watch?v=BEg29UuZk6c
+def cfar(X_k, num_guard_cells, num_ref_cells, bias, cfar_method="average"):
+    N = X_k.size
+    cfar_values = np.zeros(X_k.shape)
+    for center_index in range(
+        num_guard_cells + num_ref_cells, N - (num_guard_cells + num_ref_cells)
+    ):
+        min_index = center_index - (num_guard_cells + num_ref_cells)
+        min_guard = center_index - num_guard_cells
+        max_index = center_index + (num_guard_cells + num_ref_cells) + 1
+        max_guard = center_index + num_guard_cells + 1
+
+        lower_nearby = X_k[min_index:min_guard]
+        upper_nearby = X_k[max_guard:max_index]
+
+        lower_mean = np.mean(lower_nearby)
+        upper_mean = np.mean(upper_nearby)
+
+        if cfar_method == "average":
+            mean = np.mean(np.concatenate((lower_nearby, upper_nearby)))
+        elif cfar_method == "greatest":
+            mean = max(lower_mean, upper_mean)
+        elif cfar_method == "smallest":
+            mean = min(lower_mean, upper_mean)
+        else:
+            mean = 0
+
+        output = mean * bias
+        cfar_values[center_index] = output
+
+    targets_only = np.copy(X_k)
+    targets_only[np.where(X_k < cfar_values)] = np.ma.masked
+
+    return cfar_values, targets_only
+
+def bistaticRange2ElRange(transmitterLLA, receiverLLA, bistaticRange, az):
+    transmitterECEF = np.array(pymap3d.geodetic2ecef(*transmitterLLA))
+    receiverECEF = np.array(pymap3d.geodetic2ecef(*receiverLLA))
+
+    def distanceError(a):
+        (r, el) = a
+        estTargetECEF = np.array(pymap3d.aer2ecef(az, el, r, *transmitterLLA))
+        d1 = np.linalg.norm(estTargetECEF - transmitterECEF)
+        d2 = np.linalg.norm(estTargetECEF - receiverECEF)
+        return abs(bistaticRange - (d1 + d2))
     
-    pass
+    distMin = 0
+    distMax = distMin + (bistaticRange - distMin)/2
+    bnds = ((distMin, distMax), (1, 5))
+    x0 = ((distMin+distMax)/2, 2)
+    res = scipy.optimize.minimize(distanceError, x0, method='TNC', bounds=bnds, tol=1e-10)
+    return res.x
