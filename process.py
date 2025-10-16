@@ -52,6 +52,8 @@ while not RFDataManager.isEndOfFile():
         scan.plotNearestTargetFrames()
         frames = scan.toFrames()
 
+        # amplitudeSpectrogramPlot(scan, settings)
+
         returns = []
         for i in range(0, len(frames), 100):
             print(f"Getting returns from time t = {round(frames[i].tStart, 2)}")
@@ -65,5 +67,5 @@ while not RFDataManager.isEndOfFile():
         targets.append(targetLLA)
 
     plotReturns(allReturns, targets, scan.settings)
-    # amplitudeSpectrogramPlot(scan.applyPulseIntegration(), settings)
+    
 

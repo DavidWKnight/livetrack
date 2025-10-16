@@ -5,10 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 
+import util
 from RFTypes import Scan, Return
-
-def lin2db(x):
-    return 20 * np.log10(x + np.finfo(float).eps)
 
 def amplitudeSpectrogramPlot(scan: Scan, settings, show=True):
     fig, axes = plt.subplots(2, 1, sharex=True)
@@ -16,8 +14,8 @@ def amplitudeSpectrogramPlot(scan: Scan, settings, show=True):
     timeSeriesPlot = axes[0]
     spectrogramPlot = axes[1]
 
-    data = lin2db(scan.getMag())
-    # data = lin2db(scan.getClutterSuppressedMag())
+    data = util.lin2db(scan.getMag())
+    # data = util.lin2db(scan.getClutterSuppressedMag())
     
     data = np.clip(data, np.median(data), np.inf) # Clip bottom to the noise floor
     timeSeriesPlot.plot(scan.getDataTimes() - scan.tStart, data)
@@ -28,7 +26,7 @@ def amplitudeSpectrogramPlot(scan: Scan, settings, show=True):
     pulseLines, threshold = scan.getFramesTimesCorrected()
     for line in pulseLines:
         timeSeriesPlot.axvline(line, color='gray', linestyle='--')
-    timeSeriesPlot.axhline(lin2db(threshold), color='blue')
+    timeSeriesPlot.axhline(util.lin2db(threshold), color='blue')
 
     timeSeriesPlot.set_title('Time vs Amplitude')
     timeSeriesPlot.set_xlabel('Time (seconds)')
@@ -45,7 +43,7 @@ def amplitudeSpectrogramPlot(scan: Scan, settings, show=True):
     
 
 def amplitudePlot(scan: Scan, settings, show=True):
-    data = lin2db(scan.getMag())
+    data = util.lin2db(scan.getMag())
     data = np.clip(data, np.median(data), np.inf) # Clip bottom to the noise floor
     plt.plot(scan.getDataTimes() - scan.tStart, data)
     for tDet in scan.targetTimes:
@@ -87,53 +85,31 @@ LON_DIM = 1
 mapGeodeticDims = [[34.25, 33.875], [-117.8750, -117.3750]]
 mapPixelDims = [[0, 9000], [0, 10000]]
 
-def lerp(a: float, b: float, t: float) -> float:
-    """Linear interpolate on the scale given by a to b, using t as the point on that scale.
-    Examples
-    --------
-        50 == lerp(0, 100, 0.5)
-        4.2 == lerp(1, 5, 0.8)
-    """
-    # https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
-    return (1 - t) * a + t * b
-
-
-def inv_lerp(a: float, b: float, v: float) -> float:
-    """Inverse Linar Interpolation, get the fraction between a and b on which v resides.
-    Examples
-    --------
-        0.5 == inv_lerp(0, 100, 50)
-        0.8 == inv_lerp(1, 5, 4.2)
-    """
-    # https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
-    return (v - a) / (b - a)
-
 def LL2pixel(lat, lon):
-    # print(f"lat = {lat}")
-    percY = inv_lerp(mapGeodeticDims[LAT_DIM][0], mapGeodeticDims[LAT_DIM][1], lat)
-    percX = inv_lerp(mapGeodeticDims[LON_DIM][0], mapGeodeticDims[LON_DIM][1], lon)
+    percY = util.inv_lerp(mapGeodeticDims[LAT_DIM][0], mapGeodeticDims[LAT_DIM][1], lat)
+    percX = util.inv_lerp(mapGeodeticDims[LON_DIM][0], mapGeodeticDims[LON_DIM][1], lon)
 
     if percX < 0 or percX > 1:
         return None
     if percY < 0 or percY > 1:
         return None
 
-    y = lerp(mapPixelDims[LAT_DIM][0], mapPixelDims[LAT_DIM][1], percY)
-    x = lerp(mapPixelDims[LON_DIM][0], mapPixelDims[LON_DIM][1], percX)
+    y = util.lerp(mapPixelDims[LAT_DIM][0], mapPixelDims[LAT_DIM][1], percY)
+    x = util.lerp(mapPixelDims[LON_DIM][0], mapPixelDims[LON_DIM][1], percX)
 
     return np.array([x, y])
 
 def pixel2LL(x, y):
-    percY = inv_lerp(mapPixelDims[LAT_DIM][0], mapPixelDims[LAT_DIM][1], y)
-    percX = inv_lerp(mapPixelDims[LON_DIM][0], mapPixelDims[LON_DIM][1], x)
+    percY = util.inv_lerp(mapPixelDims[LAT_DIM][0], mapPixelDims[LAT_DIM][1], y)
+    percX = util.inv_lerp(mapPixelDims[LON_DIM][0], mapPixelDims[LON_DIM][1], x)
 
     if percX < 0 or percX > 1:
         return None
     if percY < 0 or percY > 1:
         return None
 
-    lat = lerp(mapGeodeticDims[LAT_DIM][0], mapGeodeticDims[LAT_DIM][1], percY)
-    lon = lerp(mapGeodeticDims[LON_DIM][0], mapGeodeticDims[LON_DIM][1], percX)
+    lat = util.lerp(mapGeodeticDims[LAT_DIM][0], mapGeodeticDims[LAT_DIM][1], percY)
+    lon = util.lerp(mapGeodeticDims[LON_DIM][0], mapGeodeticDims[LON_DIM][1], percX)
 
     return np.array([lat, lon])
 
