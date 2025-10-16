@@ -18,15 +18,15 @@ def chunks(lst, n):
         yield lst[i:i + n]
 
 class Return():
-    AER: np.ndarray
+    LLA: np.ndarray
     t: datetime
 
-    def __init__(self, AER, t):
-        self.AER = AER
+    def __init__(self, LLA, t):
+        self.LLA = LLA
         self.t = t
 
     def __repr__(self) -> str:
-        return f"[{self.AER[0]}, {self.AER[1]}, {self.AER[2]}], {self.t}"
+        return f"[{self.LLA[0]}, {self.LLA[1]}, {self.LLA[2]}], {self.t}"
 
 class Frame():
     def __init__(self, data, az, tStart, settings):
@@ -57,7 +57,6 @@ class Frame():
         returns = []
         for r in branges:
             r, el = bistaticRange2ElRange(self.settings['transmitterLLA'], self.settings['receiverLLA'], r, self.az)
-            print(f"r = {r}, el = {el}")
             if r < minRange or r > maxRange:
                 continue
             targetLLA = pymap3d.aer2geodetic(self.az, el, r, *self.settings['transmitterLLA'])
@@ -101,13 +100,15 @@ class Scan():
     magData: np.ndarray
     settings: dict # Not an int...
     tStart: float
-    targetTimes = List[float]
+    targetTimes: List[float]
+    targets: List[ACState]
 
     def __init__(self, data, settings, tStart):
         self.magData = np.absolute(data)
         self.settings = settings
         self.tStart = tStart
         self.targetTimes = []
+        self.targets = []
 
     def appendTarget(self, target: ACState) -> bool:
         transmitterLLA = self.settings['transmitterLLA']
@@ -132,6 +133,7 @@ class Scan():
             tDet = (dAz/360) * 4.6
         
         self.targetTimes.append(self.tStart + tDet)
+        self.targets.append(target)
         return True
 
     def getDataTimes(self) -> np.ndarray:
@@ -277,7 +279,6 @@ class Scan():
         
         return Scan(outData, self.settings, self.tStart)
 
-
     def getClutterSuppressedMag(self) -> np.ndarray:
         frameTimes, _ = self.getFramesTimes()
         magData = self.getMag()
@@ -319,6 +320,22 @@ class Scan():
         # Apply MTI
 
         return PIData
+
+    def plotNearestTargetFrames(self):
+        frameTimes, _ = self.getFramesTimesCorrected()
+        frames = self.toFrames()
+
+        for i in range(len(self.targets)):
+            tProp = self.settings['tStart'] + timedelta(seconds= self.tStart + self.targetTimes[i])
+            targetLLA = self.targets[i].getPosition(tProp)
+            [_, _, srange] = pymap3d.geodetic2aer(*targetLLA, *self.settings['transmitterLLA'])
+            rangeTime = srange / constants.speed_of_light
+            rangeIdx = int(rangeTime * self.settings['sampleRate'])
+            closestFrameIdx = np.abs(self.tStart + frameTimes - self.targetTimes[i]).argmin()
+            targetFrame = frames[closestFrameIdx]
+            plt.plot(targetFrame.getMag())
+            plt.axvline(rangeIdx)
+            plt.show()
 
 
 def collect2scans(data: np.ndarray, settings) -> List[Scan]:

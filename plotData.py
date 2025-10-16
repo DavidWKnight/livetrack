@@ -1,9 +1,11 @@
 import gc
+from typing import List
 
 import numpy as np
 import matplotlib.pyplot as plt
+from PIL import Image
 
-from RFTypes import Scan
+from RFTypes import Scan, Return
 
 def lin2db(x):
     return 20 * np.log10(x + np.finfo(float).eps)
@@ -55,4 +57,83 @@ def amplitudePlot(scan: Scan, settings, show=True):
     if show:
         plt.show()
         gc.collect() # plots don't release memory on their own for some reason
+
+mapImage = np.array(Image.open('map.jpg'))
+def plotReturns(returns: List[List[Return]], targets: List[np.ndarray], settings, show=True):
+    plt.imshow(mapImage)
     
+    transmitterXY = LL2pixel(*settings['transmitterLLA'][0:2])
+    receiverXY = LL2pixel(*settings['receiverLLA'][0:2])
+
+    targetXY = np.array([LL2pixel(LLA[0], LLA[1]) for LLA in targets])
+
+    plt.scatter(transmitterXY[0], transmitterXY[1], label='Transmitter')
+    plt.scatter(receiverXY[0], receiverXY[1], label='Receiver')
+    plt.scatter(targetXY[:,0], targetXY[:,1], label='Targets')
+    for scanIdx, scanReturns in enumerate(returns):
+        retXY = [LL2pixel(r.LLA[0], r.LLA[1]) for r in scanReturns]
+        retXY = np.array(list(filter(lambda x: x is not None, retXY)))
+        plt.scatter(retXY[:,0], retXY[:,1], label=f'Returns {scanIdx}', marker='.')
+    
+
+    if show:
+        plt.legend()
+        plt.show()
+        gc.collect() # plots don't release memory on their own for some reason
+    
+
+LAT_DIM = 0
+LON_DIM = 1
+mapGeodeticDims = [[34.25, 33.875], [-117.8750, -117.3750]]
+mapPixelDims = [[0, 9000], [0, 10000]]
+
+def lerp(a: float, b: float, t: float) -> float:
+    """Linear interpolate on the scale given by a to b, using t as the point on that scale.
+    Examples
+    --------
+        50 == lerp(0, 100, 0.5)
+        4.2 == lerp(1, 5, 0.8)
+    """
+    # https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
+    return (1 - t) * a + t * b
+
+
+def inv_lerp(a: float, b: float, v: float) -> float:
+    """Inverse Linar Interpolation, get the fraction between a and b on which v resides.
+    Examples
+    --------
+        0.5 == inv_lerp(0, 100, 50)
+        0.8 == inv_lerp(1, 5, 4.2)
+    """
+    # https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
+    return (v - a) / (b - a)
+
+def LL2pixel(lat, lon):
+    # print(f"lat = {lat}")
+    percY = inv_lerp(mapGeodeticDims[LAT_DIM][0], mapGeodeticDims[LAT_DIM][1], lat)
+    percX = inv_lerp(mapGeodeticDims[LON_DIM][0], mapGeodeticDims[LON_DIM][1], lon)
+
+    if percX < 0 or percX > 1:
+        return None
+    if percY < 0 or percY > 1:
+        return None
+
+    y = lerp(mapPixelDims[LAT_DIM][0], mapPixelDims[LAT_DIM][1], percY)
+    x = lerp(mapPixelDims[LON_DIM][0], mapPixelDims[LON_DIM][1], percX)
+
+    return np.array([x, y])
+
+def pixel2LL(x, y):
+    percY = inv_lerp(mapPixelDims[LAT_DIM][0], mapPixelDims[LAT_DIM][1], y)
+    percX = inv_lerp(mapPixelDims[LON_DIM][0], mapPixelDims[LON_DIM][1], x)
+
+    if percX < 0 or percX > 1:
+        return None
+    if percY < 0 or percY > 1:
+        return None
+
+    lat = lerp(mapGeodeticDims[LAT_DIM][0], mapGeodeticDims[LAT_DIM][1], percY)
+    lon = lerp(mapGeodeticDims[LON_DIM][0], mapGeodeticDims[LON_DIM][1], percX)
+
+    return np.array([lat, lon])
+
