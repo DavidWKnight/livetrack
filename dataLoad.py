@@ -9,8 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from radarAlgo import findDirectPathPulses, findPulseTime
-from RFTypes import Scan
 from ACState import ACPosition, ACVelocity, ACState
+from Scan import Scan
 
 def loadCollect(fname):
     acStart = loadACState(fname)

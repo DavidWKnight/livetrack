@@ -9,9 +9,6 @@ from plotData import amplitudeSpectrogramPlot
 from plotData import amplitudePlot
 from plotData import plotReturns
 
-def lin2db(x):
-    return 20 * np.log10(x + np.finfo(float).eps)
-
 folder = '/media/david/Ext/Collects/**/'
 # fnameBase = '2025-10-04T12:08:50_ABC504'
 # fnameBase = '2025-09-28T17:06:03_A3AA32'
@@ -52,7 +49,7 @@ while not RFDataManager.isEndOfFile():
         scan.plotNearestTargetFrames()
         frames = scan.toFrames()
 
-        # amplitudeSpectrogramPlot(scan, settings)
+        amplitudeSpectrogramPlot(scan, settings)
 
         returns = []
         for i in range(0, len(frames), 100):
@@ -67,5 +64,3 @@ while not RFDataManager.isEndOfFile():
         targets.append(targetLLA)
 
     plotReturns(allReturns, targets, scan.settings)
-    
-

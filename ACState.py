@@ -4,6 +4,8 @@ from typing import List
 import numpy as np
 import pymap3d
 
+import util
+
 IDX_MSG_TYPE = 1
 IDX_ICAO = 4
 IDX_CALLSIGN = 5
@@ -17,20 +19,6 @@ IDX_ALT_RATE = 16
 
 SBS_POSITION_MESSAGE = "3"
 SBS_VELOCITY_MESSAGE = "4"
-
-def lerp(a, b, t):
-  """
-  Performs linear interpolation between two values.
-
-  Args:
-    a (float): The starting value.
-    b (float): The ending value.
-    t (float): The interpolation amount, typically between 0.0 and 1.0.
-
-  Returns:
-    float: The interpolated value.
-  """
-  return a + (b - a) * t
 
 class ACPosition:
     icao: str
@@ -97,7 +85,7 @@ class ACPosition:
         a = np.array(pymap3d.geodetic2ecef(*self.LLA))
         b = np.array(pymap3d.geodetic2ecef(*other.LLA))
         x = tLerp / dt
-        c = lerp(a, b, x)
+        c = util.lerp(a, b, x)
         pos = np.array(pymap3d.ecef2geodetic(*c))
         return ACPosition(icao, t, pos)
 

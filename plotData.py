@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 import util
-from RFTypes import Scan, Return
+from Scan import Scan
+from RadReturn import RadReturn
 
 def amplitudeSpectrogramPlot(scan: Scan, settings, show=True):
     fig, axes = plt.subplots(2, 1, sharex=True)
@@ -57,7 +58,7 @@ def amplitudePlot(scan: Scan, settings, show=True):
         gc.collect() # plots don't release memory on their own for some reason
 
 mapImage = np.array(Image.open('map.jpg'))
-def plotReturns(returns: List[List[Return]], targets: List[np.ndarray], settings, show=True):
+def plotReturns(returns: List[List[RadReturn]], targets: List[np.ndarray], settings, show=True):
     plt.imshow(mapImage)
     
     transmitterXY = LL2pixel(*settings['transmitterLLA'][0:2])
