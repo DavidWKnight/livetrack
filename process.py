@@ -2,6 +2,8 @@ from datetime import timedelta
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pymap3d
+from scipy import ndimage
 
 import dataLoad
 
@@ -12,8 +14,8 @@ from plotData import plotReturns
 folder = '/media/david/Ext/Collects/**/'
 # fnameBase = '2025-10-04T12:08:50_ABC504'
 # fnameBase = '2025-09-28T17:06:03_A3AA32'
-fnameBase = '2025-10-06T17:26:46_AC98AC'
-# fnameBase = '2025-10-06T17:22:43_ABBD0A'
+# fnameBase = '2025-10-06T17:26:46_AC98AC'
+fnameBase = '2025-10-06T17:06:14_A609D4'
 # fnameBase = '2025-09-28T17:17:35_A420AF'
 
 aircraftState, settings, RFDataManager = dataLoad.loadCollect(folder + fnameBase)
@@ -40,11 +42,11 @@ aircraftState, settings, RFDataManager = dataLoad.loadCollect(folder + fnameBase
 #     previous = scan
 
 while not RFDataManager.isEndOfFile():
-
-    
     allReturns = []
     for j in range(2):
         scan = RFDataManager.getNextScan()
+
+        scan.applyPulseIntegration()
         scan.appendTarget(aircraftState)
         scan.plotNearestTargetFrames()
         frames = scan.toFrames()
@@ -55,6 +57,16 @@ while not RFDataManager.isEndOfFile():
         for i in range(0, len(frames), 100):
             print(f"Getting returns from time t = {round(frames[i].tStart, 2)}")
             returns.extend(frames[i].getReturns())
+
+        # Check for additional frames near the target
+        targetTime = settings['tStart'] + timedelta(seconds=scan.tStart)
+        targetLLA = aircraftState.getPosition(targetTime)
+        [az, _, _] = pymap3d.geodetic2aer(*targetLLA, *settings['transmitterLLA'])
+        for frame in frames:
+            if abs(frame.az - az) > 0.5:
+                continue
+            returns.extend(frame.getReturns())
+
         allReturns.append(returns)
     
     targets = []

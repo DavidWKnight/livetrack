@@ -4,6 +4,37 @@ ASR11_SCAN_RATE = 60/13 # Seconds per revolution
 ASR11_PULSE_RATE = 1e-3 # Seconds
 ASR11_PULSE_WIDTH = 1e-6 # Seconds
 
+# Code to find the pulse interval
+# [frameTimes, _] = scan.getFramesTimes()
+# betterFrameTimes = [frameTimes[0]]
+# for f in frameTimes[1:]:
+#     if f - betterFrameTimes[-1] < 500e-6:
+#         continue
+#     betterFrameTimes.append(f)
+
+# bins = np.linspace(0, 5e-3, 10000)
+# [data, dataEdges] = np.histogram(np.diff(betterFrameTimes), bins)
+# print(data)
+# mask = data > 5
+# mask = ndimage.binary_dilation(mask, [True, True, True, True, True])
+# clusters, numClusters = ndimage.label(mask)
+# centers = np.array([c[0] for c in ndimage.center_of_mass(data, clusters, range(1,numClusters+1))])
+# print(centers * (5e-3 / 10000) * 1000)
+# plt.plot(dataEdges[1:], data)
+# plt.axhline(5)
+# plt.show()
+
+def padSum(a, b):
+    """Sums up a and by similar to np.sum but retains the shape of a"""
+    if len(a) == len(b):
+        return a + b
+    elif len(a) > len(b):
+        bPad = np.pad(b, (0, len(a) - len(b)))
+        return a + bPad
+    else:
+        aPad = np.pad(a, (0, len(b) - len(a)))
+        return (b + aPad)[:len(a)]
+
 def lin2db(x):
     return 20 * np.log10(x + np.finfo(float).eps)
 

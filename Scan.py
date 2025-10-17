@@ -8,6 +8,7 @@ from scipy import ndimage, constants
 
 from ACState import ACState
 from Frame import Frame
+import util
 
 class Scan():
     magData: np.ndarray
@@ -71,57 +72,30 @@ class Scan():
         centers = np.array([c[0] for c in ndimage.center_of_mass(magData, clusters, range(1,numClusters+1))])
         return (centers / self.settings['sampleRate'], threshold)
 
-    def getFramesTimesCorrected(self) -> np.ndarray:
+    def getFramesTimesCorrected(self, modifyTimes=True) -> np.ndarray:
         centers, threshold = self.getFramesTimes()
         centers = centers * self.settings['sampleRate']
-        
-        # firstShortFound = False
-        # idxFirstLongCPI = -1
-        # for idx, interval in enumerate(np.diff(centers / self.settings['sampleRate'])):
-        #     print(interval)
-        #     if firstShortFound and np.isclose(interval, 1e-3, 0.01):
-        #         idxFirstLongCPI = idx
-        #         break
-            
-        #     if not firstShortFound and np.isclose(interval, 0.78e-3, 0.01):
-        #         firstShortFound = True
-        #         print(f"found first short!")
-        
-        # pulseTimes = [centers[idxFirstLongCPI]]
-        # tLength = self.getLength()
-
-        # CPISize = 10
-        # longPulseLength = int(1e-3 * self.settings['sampleRate'])
-        # shortPulseLength = int(0.78e-3 * self.settings['sampleRate'])
-
-        # longCPILength = int((1e-3 * CPISize) * self.settings['sampleRate'])
-        # shortCPILength = int((0.78e-3 * CPISize) * self.settings['sampleRate'])
-        # while pulseTimes[-1] < len(magData):
-        #     # # Load in data chunk at least one long CPI in size and see if data best matches a long or short CPI
-        #     # nextCPI = magData[[pulseTimes-1] : longCPILength]
-        #     # # Downsample to 10KHz
-        #     # downsampleRate = int(round(self.settings['sampleRate'] / 10e3))
-        #     # downsampleWindow = maxPool1d(nextCPI, downsampleRate)
-        #     for _ in range(10):
-        #         pulseTimes.append(pulseTimes[-1] + longPulseLength)
-        #     for _ in range(10):
-        #         pulseTimes.append(pulseTimes[-1] + shortPulseLength)
-
-        # print(pulseTimes)
-        
 
         # Correct pulse times about what we know about the transmitter
-        shortPulse = int(0.78e-3 * self.settings['sampleRate'])
-        longPulse = int(1e-3 * self.settings['sampleRate'])
+        # Note that the pulse times seem so specific that they may vary with time.
+        # It's possible we need to infer intervals by looking at the scan data instead of hard coding.
+        shortPulse = int(0.77980219e-3 * self.settings['sampleRate'])
+        longPulse = int(0.99803435e-3 * self.settings['sampleRate'])
         pulseIdxs = [centers[0]]
         for idx, c in enumerate(centers[1:]):
             interval = c - pulseIdxs[-1]
             if interval < shortPulse*0.9:
                 continue # Not a valid pulse
             elif interval > shortPulse*0.9 and interval < shortPulse*1.1:
-                pulseIdxs.append(pulseIdxs[-1] + shortPulse)
+                if modifyTimes:
+                    pulseIdxs.append(pulseIdxs[-1] + shortPulse)
+                else:
+                    pulseIdxs.append(c)
             elif interval > longPulse*0.95 and interval < longPulse*1.1:
-                pulseIdxs.append(pulseIdxs[-1] + longPulse)
+                if modifyTimes:
+                    pulseIdxs.append(pulseIdxs[-1] + longPulse)
+                else:
+                    pulseIdxs.append(c)
             else:
                 # Likely didn't pick up the next pulse in the thresholding
                 # Try to reset by cenetering the next pulse on the exact next center
@@ -140,10 +114,10 @@ class Scan():
         # pulseTimes = pulseTimes - directPulseDelay
         return (pulseTimes, threshold)
 
-    def toFrames(self, useCorrectedTimes=True) -> List[Frame]:
+    def toFrames(self, useCorrectedTimes=True, modifyTimes=True) -> List[Frame]:
         # Get the start time of each frame according to pulse locations
         if useCorrectedTimes:
-            pulseTimes, _ = self.getFramesTimesCorrected()
+            pulseTimes, _ = self.getFramesTimesCorrected(modifyTimes)
         else:
             pulseTimes, _ = self.getFramesTimes()
 
@@ -168,29 +142,29 @@ class Scan():
         pass
 
     def applyPulseIntegration(self, nIntegrations=4):
-        frames = self.toFrames(False)[1:]
-        outData = np.array([])
-        for i in range(nIntegrations):
-            outData = np.append(outData, frames[i].magData)
-            # print(len(frames[i].magData))
+        frames = self.toFrames(True, False)
 
-        startFrame = frames[0]
-        startFrame.magData = startFrame.magData[:int(self.settings['sampleRate'] * 600e-6)]
-        runningSum = sum(frames[1:nIntegrations], startFrame)
-        for i in range(nIntegrations, len(frames)):
-            if i % 100 == 0:
-                print(f"Summing frame {i} out of {len(frames)}")
-            # print(len(frames[i].magData))
-            runningSum = runningSum + frames[i]
-            runningSum = runningSum - frames[i-nIntegrations]
-            outData = np.append(outData, runningSum.magData)
+        outData = np.zeros(len(self.magData))
+        idxFrameStart = 0
+        for i in range(0, len(frames)):
+            # if i % 100 == 0:
+            #     print(f"Summing frame {i} out of {len(frames)}")
+            
+            a = frames[i].magData
+            for j in range(1, nIntegrations):
+                if i-j >= 0:
+                    a = util.padSum(a, frames[i-j].magData)
+            
+            outData[idxFrameStart:idxFrameStart+len(a)] = a
+            idxFrameStart = idxFrameStart + len(a)
 
-            # print(len(runningSum.magData))
-
-            # plt.plot(runningSum.magData)
-            # plt.show()
-        
-        return Scan(outData, self.settings, self.tStart)
+            # if True and i % 100 == 0:
+            #     for j in range(nIntegrations):
+            #         plt.plot(frames[i-j].magData, label=f'{-j}')
+            #     plt.plot(a, label='Full')
+            #     plt.legend()
+            #     plt.show()
+        self.magData = outData
 
     def getClutterSuppressedMag(self) -> np.ndarray:
         frameTimes, _ = self.getFramesTimes()
@@ -241,12 +215,19 @@ class Scan():
         for i in range(len(self.targets)):
             tProp = self.settings['tStart'] + timedelta(seconds= self.tStart + self.targetTimes[i])
             targetLLA = self.targets[i].getPosition(tProp)
-            [_, _, srange] = pymap3d.geodetic2aer(*targetLLA, *self.settings['transmitterLLA'])
+            [_, _, srangeTransmitter] = pymap3d.geodetic2aer(*targetLLA, *self.settings['transmitterLLA'])
+            [_, _, srangeReciever] = pymap3d.geodetic2aer(*targetLLA, *self.settings['receiverLLA'])
+            srange = srangeTransmitter + srangeReciever
             rangeTime = srange / constants.speed_of_light
             rangeIdx = int(rangeTime * self.settings['sampleRate'])
             closestFrameIdx = np.abs(self.tStart + frameTimes - self.targetTimes[i]).argmin()
             targetFrame = frames[closestFrameIdx]
+
+            [_, _, r] = pymap3d.geodetic2aer(*self.settings['receiverLLA'], *self.settings['transmitterLLA'])
+            rIdx = (r / constants.speed_of_light)*self.settings['sampleRate']
             plt.plot(targetFrame.getMag())
-            plt.axvline(rangeIdx)
+            plt.axvline(rangeIdx, color='red')
+            plt.axvline(rIdx, color='pink')
+            plt.title(f'Nearst target frame at az {round(targetFrame.az,1)} - frame {closestFrameIdx}')
             plt.show()
 

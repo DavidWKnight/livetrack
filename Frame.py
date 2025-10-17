@@ -1,4 +1,5 @@
 from typing import List
+import copy
 
 import pymap3d
 import numpy as np
@@ -49,7 +50,7 @@ class Frame():
         return self.magData
 
     def __add__(self, other):
-        result = self.magData
+        result = copy.copy(self.magData)
         otherIsShorter = len(other.magData) < len(self.magData)
         otherIsLonger = len(other.magData) > len(self.magData)
 
@@ -63,7 +64,7 @@ class Frame():
         return Frame(result, self.az, self.tStart, self.settings)
 
     def __sub__(self, other):
-        result = self.magData
+        result = copy.copy(self.magData)
         otherIsShorter = len(other.magData) < len(self.magData)
         otherIsLonger = len(other.magData) > len(self.magData)
 
