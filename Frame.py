@@ -17,12 +17,13 @@ class Frame():
         self.tStart = tStart
         self.settings = settings
 
-    def getReturns(self) -> List[RadReturn]:
+    def getReturns(self, startIdx=0, endIdx=None) -> List[RadReturn]:
         # Perform CFAR, take CFAR parameters as args
-        [cfar_values, targets_only] = cfar(self.magData, 3, 3, 3)
+        procData = self.magData[startIdx:endIdx]
+        [cfar_values, targets_only] = cfar(procData, 3, 3, 3)
         mask = ndimage.binary_erosion(targets_only)
         clusters, numClusters = ndimage.label(mask)
-        centers = np.array([c[0] for c in ndimage.center_of_mass(self.magData, clusters, range(1,numClusters+1))])
+        centers = np.array([c[0] for c in ndimage.center_of_mass(procData, clusters, range(1,numClusters+1))])
 
         if False:
             targets_only[~mask] = 0
@@ -30,7 +31,7 @@ class Frame():
             plt.plot(cfar_values, label='cfar')
             plt.legend()
             plt.show()
-
+        centers = centers + startIdx # Add back in the part we skipped
         branges = (centers / self.settings['sampleRate']) * constants.speed_of_light
 
         minRange = 500 # Meters

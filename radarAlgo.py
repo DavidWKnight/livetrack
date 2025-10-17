@@ -33,7 +33,7 @@ def findDirectPathPulses(data: np.ndarray, sampleRate: float, resolution=1, plot
     newSampleRate = sampleRate / decimate
     
     # Calculate the threshold to use to find peaks
-    expectedPulsesPerWindow = util.ASR11_SCAN_RATE / (1/newSampleRate)
+    expectedPulsesPerWindow = util.ASR9_SCAN_RATE / (1/newSampleRate)
     percent = (1 - (1/expectedPulsesPerWindow)) * 100
     margin = 0.02 # percent, determined experimentally
     percent = percent * (1-margin)
@@ -86,22 +86,22 @@ def filterPulses(centers: np.ndarray, tMax: float):
     # Try to skip over detected pulses to see if it would result in a pulse closer to the expected time
     # Do this by finding the indexes that most likely align to the ASR11 frequency and then removing those that don't line up
     diff = np.diff(centers)
-    rightPlace = [util.isCloseMultiple(d, util.ASR11_SCAN_RATE, 0.2) for d in diff]
+    rightPlace = [util.isCloseMultiple(d, util.ASR9_SCAN_RATE, 0.2) for d in diff]
     rightPlace.append(True)
     centers = centers[rightPlace]
 
 
     # Extend the centers array out to the beginning of the time range
-    nPulsesToInsert = np.floor(centers[0] / util.ASR11_SCAN_RATE)
-    pulseOffsets = np.array(range(1, int(nPulsesToInsert)+1)) * util.ASR11_SCAN_RATE
+    nPulsesToInsert = np.floor(centers[0] / util.ASR9_SCAN_RATE)
+    pulseOffsets = np.array(range(1, int(nPulsesToInsert)+1)) * util.ASR9_SCAN_RATE
     newCenters = centers[0] - pulseOffsets[::-1]
     centers = np.hstack([newCenters, centers])
 
     # Extend the centers array out to the end of the time range
-    nPulsesToInsert = np.floor((tMax-centers[-1]) / util.ASR11_SCAN_RATE)
+    nPulsesToInsert = np.floor((tMax-centers[-1]) / util.ASR9_SCAN_RATE)
     b = range(1, int(nPulsesToInsert)+1)
     a = np.array(b)
-    pulseOffsets = a * util.ASR11_SCAN_RATE
+    pulseOffsets = a * util.ASR9_SCAN_RATE
     newCenters = centers[-1] + pulseOffsets
     centers = np.hstack([centers, newCenters])
 
@@ -111,11 +111,11 @@ def filterPulses(centers: np.ndarray, tMax: float):
     previous = centers[0]
     for c in centers[1:]:
         diff = c - previous
-        rightPlace = util.isCloseMultiple(diff, util.ASR11_SCAN_RATE, 0.25)
-        bigEnough = diff > util.ASR11_SCAN_RATE*1.5
+        rightPlace = util.isCloseMultiple(diff, util.ASR9_SCAN_RATE, 0.25)
+        bigEnough = diff > util.ASR9_SCAN_RATE*1.5
 
         if rightPlace and bigEnough:
-            nSkippedPulses = np.round(diff / util.ASR11_SCAN_RATE)
+            nSkippedPulses = np.round(diff / util.ASR9_SCAN_RATE)
             missing = np.linspace(previous, c, int(nSkippedPulses)+1)
             missing = missing[1:] # Skip the 'previous' point, it's already been added
             newCenters.extend(missing)
@@ -154,7 +154,7 @@ def findPulseTime(data: np.ndarray, sampleRate: float, resolution: int=1, plot: 
     return weightedCenter / sampleRate, weightedCenter
 
 def matchFilter(data: np.ndarray, sampleRate: float) -> np.ndarray:
-    matchLenth = int(np.ceil(sampleRate * util.ASR11_PULSE_WIDTH))
+    matchLenth = int(np.ceil(sampleRate * util.ASR9_PULSE_WIDTH))
     kernel = np.ones(matchLenth)
     return np.convolve(data, kernel, 'valid')
 
@@ -177,7 +177,7 @@ def pulseIntegration(data: np.ndarray, sampleRate: float, numIntegrations: int=1
     return output
 
 # def movingTargetIndicator(data: np.ndarray, sampleRate: float, scanStartSample):
-#     slowFrameSize = int(util.ASR11_SCAN_RATE * sampleRate)
+#     slowFrameSize = int(util.ASR9_SCAN_RATE * sampleRate)
 #     slowFrames = list(chunks(data[scanStartSample:], slowFrameSize))
     
 #     output = data[scanStartSample:] # Retain the stuff from before the scan started

@@ -79,8 +79,8 @@ class Scan():
         # Correct pulse times about what we know about the transmitter
         # Note that the pulse times seem so specific that they may vary with time.
         # It's possible we need to infer intervals by looking at the scan data instead of hard coding.
-        shortPulse = int(0.77980219e-3 * self.settings['sampleRate'])
-        longPulse = int(0.99803435e-3 * self.settings['sampleRate'])
+        shortPulse = int(util.ASR9_SHORT_PULSE_INTERVAL * self.settings['sampleRate'])
+        longPulse = int(util.ASR9_LONG_PULSE_INTERVAL * self.settings['sampleRate'])
         pulseIdxs = [centers[0]]
         for idx, c in enumerate(centers[1:]):
             interval = c - pulseIdxs[-1]

@@ -1,9 +1,11 @@
 from datetime import timedelta
+import time
 
 import numpy as np
 import matplotlib.pyplot as plt
 import pymap3d
 from scipy import ndimage
+from scipy import constants
 
 import dataLoad
 
@@ -48,15 +50,22 @@ while not RFDataManager.isEndOfFile():
 
         scan.applyPulseIntegration()
         scan.appendTarget(aircraftState)
-        scan.plotNearestTargetFrames()
+        # scan.plotNearestTargetFrames()
         frames = scan.toFrames()
 
-        amplitudeSpectrogramPlot(scan, settings)
+        # amplitudeSpectrogramPlot(scan, settings)
 
+        tStart = time.time()
         returns = []
+
+        [_, _, rDirect] = pymap3d.geodetic2aer(*settings['receiverLLA'], *settings['transmitterLLA'])
+        tDirect = rDirect / constants.speed_of_light
+        tMaxDist = 100e3 / constants.speed_of_light
         for i in range(0, len(frames), 100):
             print(f"Getting returns from time t = {round(frames[i].tStart, 2)}")
-            returns.extend(frames[i].getReturns())
+            returns.extend(frames[i].getReturns(int(tDirect*settings['sampleRate']), int(tMaxDist*settings['sampleRate'])))
+        tEnd = time.time()
+        print(f"Took {tEnd - tStart} seconds")
 
         # Check for additional frames near the target
         targetTime = settings['tStart'] + timedelta(seconds=scan.tStart)
