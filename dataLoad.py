@@ -18,7 +18,7 @@ def loadCollect(fname):
     rfData = RFDataManager(fname, settings)
     return (acStart, settings, rfData)
 
-def loadACState(fname):
+def loadACState(fname) -> ACState:
     posFile = glob.glob(fname + '_pos.csv', recursive=True)[0]
     velFile = glob.glob(fname + '_vel.csv', recursive=True)[0]
     pos = loadPos(posFile)
@@ -26,7 +26,7 @@ def loadACState(fname):
     state = ACState(pos[0].icao, pos, vel)
     return state
 
-def loadRF(fname) -> np.ndarray:
+def loadRF(fname) -> np.ndarray | None:
     rfFile = glob.glob(fname + '.dat*', recursive=True)[0]
     if rfFile.endswith('.gz'):
         with gzip.open(rfFile, 'rb') as file:
@@ -105,7 +105,7 @@ class RFDataManager():
         data = data[::2] + 1j * data[1::2]
         return data
 
-    def loadBufferToSize(self, nSamples: int):
+    def loadBufferToSize(self, nSamples: int) -> None:
         loadSize = int(nSamples) - len(self.dataBuffer)
         if loadSize > 0:
             self.dataBuffer = np.append(self.dataBuffer, self.load(loadSize))
