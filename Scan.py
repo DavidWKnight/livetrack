@@ -8,6 +8,7 @@ from scipy import ndimage, constants
 
 from ACState import ACState
 from Frame import Frame
+from RadReturn import RadReturn
 import util
 
 class Scan():
@@ -49,6 +50,14 @@ class Scan():
         self.targetTimes.append(self.tStart + tDet)
         self.targets.append(target)
         return True
+
+    def getTargetLocations(self) -> List[np.ndarray]:
+        targets = []
+        for i in range(len(self.targets)):
+            tProp = self.settings['tStart'] + timedelta(seconds= self.tStart + self.targetTimes[i])
+            targetLLA = self.targets[i].getPosition(tProp)
+            targets.append(targetLLA)
+        return targets
 
     def getDataTimes(self) -> np.ndarray:
         """Return the time that each scan data point is at."""
@@ -110,6 +119,7 @@ class Scan():
         directPulseDelay = np.linalg.norm(receiverECEF - transmitterECEF) / constants.speed_of_light
 
         pulseTimes = (np.array(pulseIdxs) / self.settings['sampleRate']) - directPulseDelay
+        pulseTimes = np.clip(pulseTimes, 0, None)
         # pulseTimes = centers / self.settings['sampleRate'] # For uncorrected
         # pulseTimes = pulseTimes - directPulseDelay
         return (pulseTimes, threshold)
@@ -137,9 +147,11 @@ class Scan():
 
         return frames
 
-    def applyMatchedFilter(self):
-        # Apply matched filter to self and return
-        pass
+    def applyMatchedFilter(self, kernel=None):
+        if kernel is None:
+            pulseWidthSamples = int(np.ceil(util.ASR9_PULSE_WIDTH * self.settings['sampleRate']))
+            kernel = np.ones(pulseWidthSamples)
+        self.magData = np.convolve(self.magData, kernel)
 
     def applyPulseIntegration(self, nIntegrations=4):
         frames = self.toFrames(True, False)
@@ -166,68 +178,58 @@ class Scan():
             #     plt.show()
         self.magData = outData
 
-    def getClutterSuppressedMag(self) -> np.ndarray:
-        frameTimes, _ = self.getFramesTimes()
-        magData = self.getMag()
-        print(len(magData))
-        # Apply matched filter
-        
-        # Apply pulse integration
-        nIntegrations = 4
-        frameIndexes = np.int64(np.round(frameTimes*self.settings['sampleRate']))
-        frameIndexes = np.append([0], frameIndexes)
-        frameIndexes = np.append(frameIndexes, [len(magData)])
+    def applyMovingTargetIndicator(self, previousScan):
+        frameTimes, _ = self.getFramesTimesCorrected(False)
+        prevFrameTimes, _ = previousScan.getFramesTimesCorrected(False)
 
-        frameData = []
-        for start, end in zip(frameIndexes[:-1], frameIndexes[1:]):
-            frameData.append(magData[start:end])
+        for tStart, tEnd in zip(frameTimes[:-1], frameTimes[1:]):
+            prevStartTimeIdx = util.nearestIdx(prevFrameTimes, tStart)
+            prevStart = prevFrameTimes[prevStartTimeIdx]
+            prevEnd = prevFrameTimes[prevStartTimeIdx+1]
+            prevStartIdx = int(prevStart * previousScan.settings['sampleRate'])
+            prevEndIdx = int(prevEnd * previousScan.settings['sampleRate'])
 
-        PIData = np.array([])
-        for i in range(nIntegrations):
-            PIData = np.append(PIData, frameData[i])
+            startIdx = int(tStart * previousScan.settings['sampleRate'])
+            endIdx = int(tEnd * previousScan.settings['sampleRate'])
 
-        for i in range(nIntegrations, len(frameData)):
-            frameWindow = frameData[i-nIntegrations : i]
-            intWindow = frameWindow[-1]
-            for window in frameWindow[:-1]:
-                diff = len(intWindow) - len(window)
-                if diff == 0:
-                    intWindow = intWindow + window
-                elif diff > 0: # previous window is short than this one
-                    intWindow[:len(window)] = intWindow[:len(window)] + window
-                else: # Previous window is longer
-                    intWindow = intWindow + window[len(intWindow)]
-            
-            PIData = np.append(PIData, intWindow)
+            prevData = previousScan.magData[prevStartIdx:prevEndIdx]
+            mtiData = util.padSub(self.magData[startIdx:endIdx], prevData)
+            mtiData = np.clip(mtiData, 0, None)
+            if False:
+                plt.plot(self.magData[startIdx:endIdx], label='Original')
+                plt.plot(prevData, label='Previous')
+                plt.plot(mtiData, label='After')
+                plt.legend()
+                plt.show()
 
-        plt.plot(magData)
-        plt.plot(PIData/nIntegrations)
-        plt.show()
-        print(len(PIData))
-        # Apply MTI
+            self.magData[startIdx:endIdx] = mtiData
 
-        return PIData
+    def getAllReturns(self, downsample=1) -> list[RadReturn]:
+        frames = self.toFrames()
+        [_, _, rDirect] = pymap3d.geodetic2aer(*self.settings['receiverLLA'], *self.settings['transmitterLLA'])
+        tDirect = rDirect / constants.speed_of_light
+        tMaxDist = 100e3 / constants.speed_of_light
+        idxDirect = int(tDirect*self.settings['sampleRate'])
+        idxMax = int(tMaxDist*self.settings['sampleRate'])
+
+        rets = []
+        for i in range(0, len(frames), downsample):
+            print(f"Getting returns from time t = {round(frames[i].tStart, 2)}")
+            rets.extend(frames[i].getReturns(idxDirect, idxMax))
+        return rets
 
     def plotNearestTargetFrames(self):
         frameTimes, _ = self.getFramesTimesCorrected()
         frames = self.toFrames()
 
+        targetLLAs = []
         for i in range(len(self.targets)):
             tProp = self.settings['tStart'] + timedelta(seconds= self.tStart + self.targetTimes[i])
             targetLLA = self.targets[i].getPosition(tProp)
-            [_, _, srangeTransmitter] = pymap3d.geodetic2aer(*targetLLA, *self.settings['transmitterLLA'])
-            [_, _, srangeReciever] = pymap3d.geodetic2aer(*targetLLA, *self.settings['receiverLLA'])
-            srange = srangeTransmitter + srangeReciever
-            rangeTime = srange / constants.speed_of_light
-            rangeIdx = int(rangeTime * self.settings['sampleRate'])
-            closestFrameIdx = np.abs(self.tStart + frameTimes - self.targetTimes[i]).argmin()
-            targetFrame = frames[closestFrameIdx]
+            targetLLAs.append(targetLLA)
 
-            [_, _, r] = pymap3d.geodetic2aer(*self.settings['receiverLLA'], *self.settings['transmitterLLA'])
-            rIdx = (r / constants.speed_of_light)*self.settings['sampleRate']
-            plt.plot(targetFrame.getMag())
-            plt.axvline(rangeIdx, color='red')
-            plt.axvline(rIdx, color='pink')
-            plt.title(f'Nearst target frame at az {round(targetFrame.az,1)} - frame {closestFrameIdx}')
-            plt.show()
+        closestFrameIdx = np.abs(self.tStart + frameTimes - self.targetTimes[i]).argmin()
+        targetFrame = frames[closestFrameIdx]
+        targetFrame.plotWithTargets(targetLLAs)
+
 

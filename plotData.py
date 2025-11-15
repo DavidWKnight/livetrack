@@ -63,17 +63,29 @@ def plotReturns(returns: List[List[RadReturn]], targets: List[np.ndarray], setti
     
     transmitterXY = LL2pixel(*settings['transmitterLLA'][0:2])
     receiverXY = LL2pixel(*settings['receiverLLA'][0:2])
+    if transmitterXY is None or receiverXY is None:
+        return
 
     targetXY = np.array([LL2pixel(LLA[0], LLA[1]) for LLA in targets])
 
     plt.scatter(transmitterXY[0], transmitterXY[1], label='Transmitter')
     plt.scatter(receiverXY[0], receiverXY[1], label='Receiver')
     plt.scatter(targetXY[:,0], targetXY[:,1], label='Targets')
+    for target in targets:
+        XY = LL2pixel(target[0], target[1])
+        if XY is None:
+            continue
+        plt.text(XY[0], XY[1], f"{target[2]/1e3:.2f}")
+
     for scanIdx, scanReturns in enumerate(returns):
         retXY = [LL2pixel(r.LLA[0], r.LLA[1]) for r in scanReturns]
         retXY = np.array(list(filter(lambda x: x is not None, retXY)))
         plt.scatter(retXY[:,0], retXY[:,1], label=f'Returns {scanIdx}', marker='.')
-    
+        for r in scanReturns:
+            XY = LL2pixel(r.LLA[0], r.LLA[1])
+            if XY is None:
+                continue
+            plt.text(XY[0], XY[1], f"{r.LLA[2]/1e3:.2f}")
 
     if show:
         plt.legend()
@@ -86,7 +98,7 @@ LON_DIM = 1
 mapGeodeticDims = [[34.25, 33.875], [-117.8750, -117.3750]]
 mapPixelDims = [[0, 9000], [0, 10000]]
 
-def LL2pixel(lat, lon):
+def LL2pixel(lat, lon) -> np.ndarray | None:
     percY = util.inv_lerp(mapGeodeticDims[LAT_DIM][0], mapGeodeticDims[LAT_DIM][1], lat)
     percX = util.inv_lerp(mapGeodeticDims[LON_DIM][0], mapGeodeticDims[LON_DIM][1], lon)
 
@@ -100,7 +112,7 @@ def LL2pixel(lat, lon):
 
     return np.array([x, y])
 
-def pixel2LL(x, y):
+def pixel2LL(x, y) -> np.ndarray | None:
     percY = util.inv_lerp(mapPixelDims[LAT_DIM][0], mapPixelDims[LAT_DIM][1], y)
     percX = util.inv_lerp(mapPixelDims[LON_DIM][0], mapPixelDims[LON_DIM][1], x)
 

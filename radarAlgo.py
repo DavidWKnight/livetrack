@@ -68,7 +68,7 @@ def findDirectPathPulses(data: np.ndarray, sampleRate: float, resolution=1, plot
 
     return np.array(centers), np.array(centerIndexes)
 
-def refineCenters(data, centers, sampleRate, decimateTime, resolution, plot):
+def refineCenters(data, centers, sampleRate, decimateTime, resolution, plot) -> np.ndarray:
     refinedCenters = []
     centerIndexes = []
     for c in centers:
@@ -76,13 +76,19 @@ def refineCenters(data, centers, sampleRate, decimateTime, resolution, plot):
         windowEnd = c + decimateTime
         windowStartIdx = np.int64(windowStart * sampleRate)
         windowEndIdx = np.int64(windowEnd * sampleRate)
+
+        if windowStartIdx < 0:
+            continue
+        if windowEndIdx > len(data):
+            continue
+
         window = data[windowStartIdx:windowEndIdx]
         newCenter, newCenterIdx = findPulseTime(window, sampleRate, resolution, plot)
         refinedCenters.append(newCenter + windowStart)
         centerIndexes.append(newCenterIdx + windowStartIdx)
     return np.array(refinedCenters)
 
-def filterPulses(centers: np.ndarray, tMax: float):
+def filterPulses(centers: np.ndarray, tMax: float) -> np.ndarray:
     # Try to skip over detected pulses to see if it would result in a pulse closer to the expected time
     # Do this by finding the indexes that most likely align to the ASR11 frequency and then removing those that don't line up
     diff = np.diff(centers)
@@ -225,20 +231,17 @@ def cfar(X_k, num_guard_cells, num_ref_cells, bias, cfar_method="average"):
 
     return cfar_values, targets_only
 
-def bistaticRange2ElRange(transmitterLLA, receiverLLA, bistaticRange, az):
-    transmitterECEF = np.array(pymap3d.geodetic2ecef(*transmitterLLA))
+def bistaticRange2ElRange(transmitterLLA, receiverLLA, bistaticRange, az, el):
     receiverECEF = np.array(pymap3d.geodetic2ecef(*receiverLLA))
 
     def distanceError(a):
-        (r, el) = a
-        estTargetECEF = np.array(pymap3d.aer2ecef(az, el, r, *transmitterLLA))
-        d1 = np.linalg.norm(estTargetECEF - transmitterECEF)
+        (r) = a
+        estTargetECEF = pymap3d.aer2ecef(az, el, r, *transmitterLLA)
+        d1 = r
         d2 = np.linalg.norm(estTargetECEF - receiverECEF)
         return abs(bistaticRange - (d1 + d2))
-    
-    distMin = 0
-    distMax = distMin + (bistaticRange - distMin)/2
-    bnds = ((distMin, distMax), (1, 5))
-    x0 = ((distMin+distMax)/2, 2)
-    res = scipy.optimize.minimize(distanceError, x0, method='TNC', bounds=bnds, tol=1e-10)
+
+    res = scipy.optimize.minimize_scalar(distanceError, bounds=(0, bistaticRange), method='bounded')
+    if not res.success:
+        return None
     return res.x
