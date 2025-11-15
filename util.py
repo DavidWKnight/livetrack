@@ -27,6 +27,10 @@ ASR9_PULSE_WIDTH = 1e-6 # Seconds
 # plt.axhline(5)
 # plt.show()
 
+def nearestIdx(arr, b):
+    """Find which index into arr is closest to the value b."""
+    return np.abs(arr - b).argmin()
+
 def padSum(a, b):
     """Sums up a and by similar to np.sum but retains the shape of a"""
     if len(a) == len(b):
@@ -36,7 +40,18 @@ def padSum(a, b):
         return a + bPad
     else:
         aPad = np.pad(a, (0, len(b) - len(a)))
-        return (b + aPad)[:len(a)]
+        return (aPad + b)[:len(a)]
+
+def padSub(a, b):
+    """Subtracks b from a np.subtract but retains the shape of a"""
+    if len(a) == len(b):
+        return a - b
+    elif len(a) > len(b):
+        bPad = np.pad(b, (0, len(a) - len(b)))
+        return a - bPad
+    else:
+        aPad = np.pad(a, (0, len(b) - len(a)))
+        return (aPad - b)[:len(a)]
 
 def lin2db(x):
     return 20 * np.log10(x + np.finfo(float).eps)
