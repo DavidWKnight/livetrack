@@ -5,7 +5,9 @@ ASR9_LONG_PULSE_INTERVAL = 0.99803435e-3 # Seconds
 ASR9_SHORT_PULSE_INTERVAL = 0.77980219e-3 # Seconds
 ASR9_PULSE_WIDTH = 1e-6 # Seconds
 
-
+ASR9_AZ_STD = (1.4*1.5/3)
+ASR9_EL_STD = (3/3)
+ASR9_RANGE_STD = (500 / 3)
 
 # Code to find the pulse interval
 # [frameTimes, _] = scan.getFramesTimes()
