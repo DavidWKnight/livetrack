@@ -21,7 +21,7 @@ class Frame():
     def getReturns(self, startIdx=0, endIdx=None, targetEl=None, plot=None) -> List[RadReturn]:
         # Perform CFAR, take CFAR parameters as args
         procData = self.magData[startIdx:endIdx]
-        [cfar_values, targets_only] = cfar(procData, 3, 3, 3)
+        [cfar_values, targets_only] = cfar(procData, 3, 4, 3)
         mask = ndimage.binary_erosion(targets_only)
         clusters, numClusters = ndimage.label(mask)
         if numClusters == 0:
@@ -52,14 +52,29 @@ class Frame():
             r = bistaticRange2ElRange(self.settings['transmitterLLA'], self.settings['receiverLLA'], br, self.az, initialElEst)
             # Then infer an elevation angle from the profile
             testENU = pymap3d.aer2enu(self.az, initialElEst, r)
-            el = elProfile(np.linalg.norm(testENU[0:2]))
+            if targetEl is not None:
+                el = targetEl
+            elif self.az < 270+30 and self.az > 270-30:
+                el = 7
+            elif self.az < 90+30 and self.az > 90+30:
+                el = 5
+            else:
+                el = elProfile(np.linalg.norm(testENU[0:2]))
+            
+
+            el = np.clip(el, 0, 12)
             r = bistaticRange2ElRange(self.settings['transmitterLLA'], self.settings['receiverLLA'], br, self.az, el)
 
             if r is None:
                 continue
+            if r > 25e3:
+                continue
+            if r < 500:
+                continue
 
-            targetLLA = pymap3d.aer2geodetic(self.az, el, r, *self.settings['transmitterLLA'])
-            returns.append(RadReturn(targetLLA, self.tStart))
+            targetAER = np.array([self.az, el, r])
+            targetLLA = pymap3d.aer2geodetic(*targetAER, *self.settings['transmitterLLA'])
+            returns.append(RadReturn(targetLLA, targetAER, self.tStart))
         return returns
 
     def plotWithTargets(self, targetLLAs):
