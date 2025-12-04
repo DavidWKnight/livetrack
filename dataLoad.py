@@ -1,3 +1,4 @@
+import os
 import csv
 import glob
 import gzip
@@ -14,9 +15,35 @@ from Scan import Scan
 
 def loadCollect(fname):
     acStart = loadACState(fname)
+    try:
+        allAC = loadAllAC(fname)
+    except:
+        allAC = {}
+    
     settings = loadSettings(fname)
     rfData = RFDataManager(fname, settings)
-    return (acStart, settings, rfData)
+    return (acStart, allAC, settings, rfData)
+
+def loadAllAC(fname):
+    posFile = glob.glob(fname + '_pos.csv', recursive=True)[0]
+    dir = os.path.dirname(posFile)
+
+    pos = loadPos(dir + '/allPos.csv')
+    vel = loadVel(dir + '/allVel.csv')
+
+    allACState = {}
+    for p in pos:
+        if p.icao not in allACState:
+            allACState[p.icao] = ACState(p.icao)
+        
+        allACState[p.icao].appendPos(p)
+    
+    for v in vel:
+        if v.icao not in allACState:
+            allACState[p.icao] = ACState(p.icao)
+        allACState[p.icao].appendVel(p)
+    
+    return allACState
 
 def loadACState(fname) -> ACState:
     posFile = glob.glob(fname + '_pos.csv', recursive=True)[0]
@@ -39,7 +66,7 @@ def loadRF(fname) -> np.ndarray | None:
         return data
     return None
 
-def loadPos(fname) -> List[ACPosition]:
+def loadPos(fname, skipHeader=False) -> List[ACPosition]:
     with open(fname, 'r') as file:
         csv_reader = csv.reader(file)
         posData = list(csv_reader)
@@ -47,14 +74,15 @@ def loadPos(fname) -> List[ACPosition]:
         def removeLineSpaces(a):
             return list(map(lambda x: x.lstrip(), a))
         
-        header = removeLineSpaces(posData[0])
-        icaoIdx = header.index('ICAO')
-        tIdx = header.index('t')
-        latIdx = header.index('Lat')
-        lonIdx = header.index('Lon')
-        altIdx = header.index('Alt')
-
-        posData = posData[1:] # Remove header
+        if not skipHeader:
+            header = removeLineSpaces(posData[0])
+            icaoIdx = header.index('ICAO')
+            tIdx = header.index('t')
+            latIdx = header.index('Lat')
+            lonIdx = header.index('Lon')
+            altIdx = header.index('Alt')
+            posData = posData[1:] # Remove header
+        
         pos = []
         for line in posData:
             line = removeLineSpaces(line)
@@ -66,7 +94,32 @@ def loadPos(fname) -> List[ACPosition]:
     return None
 
 def loadVel(fname) -> List[ACVelocity]:
-    return []
+    with open(fname, 'r') as file:
+        csv_reader = csv.reader(file)
+        velData = list(csv_reader)
+        
+        def removeLineSpaces(a):
+            return list(map(lambda x: x.lstrip(), a))
+        
+        header = removeLineSpaces(velData[0])
+        icaoIdx = header.index('ICAO')
+        tIdx = header.index('t')
+        gsIdx = header.index('Ground Speed')
+        trackIdx = header.index('Track')
+        altRateIdx = header.index('Alt Rate')
+
+        velData = velData[1:] # Remove header
+        pos = []
+        for line in velData:
+            line = removeLineSpaces(line)
+            icao = line[icaoIdx]
+            t = datetime.fromisoformat(line[tIdx]) - timedelta(seconds=0.1)
+            gs = float(line[gsIdx])
+            heading = float(line[trackIdx])
+            altRate = float(line[altRateIdx])
+            pos.append(ACVelocity(icao, t, heading, gs, altRate))
+        return pos
+    return None
 
 def loadSettings(fname) -> dict:
     settingsFile = glob.glob(fname + '_settings.json', recursive=True)[0]
