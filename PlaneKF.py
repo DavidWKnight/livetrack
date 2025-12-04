@@ -19,7 +19,7 @@ class PlaneKF():
 
         self.s = Saver(self.kf)
 
-    def addReturn(self, ret: RadReturn):
+    def estimate(self, ret: RadReturn):
         dt = (ret.t - self.t[-1]).seconds
 
         # State transition Matrix
@@ -46,6 +46,10 @@ class PlaneKF():
         self.s.save()
 
         self.t.append(ret.t)
+
+    def predictPos(self, t):
+        dt = (t - self.t[-1]).seconds
+        return self.getPos() + self.getVel()*dt
 
     def getPos(self) -> np.ndarray:
         return self.kf.x[::2]

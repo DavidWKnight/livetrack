@@ -82,7 +82,7 @@ def testPlaneKF():
         estimateError.append(np.linalg.norm(estimateENU - pTruth[tIdx]))
 
         estimate = RadReturn(estimateLLA, estimateAER, t)
-        pkf.addReturn(estimate)
+        pkf.estimate(estimate)
 
         error.append(np.linalg.norm(pkf.getPos() - pTruth[tIdx]))
         xyError.append(np.linalg.norm(pkf.getPos()[:2] - pTruth[tIdx,:2]))
