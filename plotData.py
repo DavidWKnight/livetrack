@@ -70,7 +70,8 @@ def plotReturns(returns: List[List[RadReturn]], targets: List[np.ndarray], setti
 
     plt.scatter(transmitterXY[0], transmitterXY[1], label='Transmitter')
     plt.scatter(receiverXY[0], receiverXY[1], label='Receiver')
-    plt.scatter(targetXY[:,0], targetXY[:,1], label='Targets')
+    if targetXY.shape != (0,):
+        plt.scatter(targetXY[:,0], targetXY[:,1], label='Targets')
     for target in targets:
         XY = LL2pixel(target[0], target[1])
         if XY is None:
