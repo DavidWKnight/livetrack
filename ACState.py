@@ -128,6 +128,22 @@ class ACVelocity:
         line += "\n"
         return line
 
+    def lerp(self, other, t):
+        # Only valid if 
+
+        icao = self.icao
+        dt = (other.t - self.t).total_seconds()
+        tLerp = (t - self.t).total_seconds()
+        if dt > 60:
+            return None # This is a terrible approximation
+
+        x = tLerp / dt
+        heading = util.lerp(self.heading, other.heading, x)
+        groundSpeed = util.lerp(self.groundSpeed, other.groundSpeed, x)
+        altRate = util.lerp(self.altRate, other.altRate, x)
+        
+        return ACVelocity(icao, t, heading, groundSpeed, altRate)
+
 class ACState:
     icao: str
     positions = List[ACPosition]
@@ -138,7 +154,15 @@ class ACState:
         self.positions = positions
         self.velocities = velocities
 
-    def getPosition(self, t: datetime, extrap: bool=False) -> np.array:
+    def appendPos(self, pos: ACPosition) -> None:
+        self.positions.append(pos)
+        # Should sort
+    
+    def appendVel(self, vel: ACVelocity) -> None:
+        self.velocities.append(vel)
+        # Should sort
+
+    def getPosition(self, t: datetime, extrap: bool=False) -> np.ndarray:
         # Find the first recording that is after the requested time
         t2Idx = -1
         for idx, pos in enumerate(self.positions):
@@ -161,6 +185,37 @@ class ACState:
         out = self.positions[t1Idx].lerp(self.positions[t2Idx], t)
         return out.LLA
 
-    def getVelocity(self, t: datetime) -> np.array:
-        pass
+    def getVelocity(self, t: datetime, extrap: bool=False) -> np.ndarray:
+        # Find the first recording that is after the requested time
+        t2Idx = -1
+        for idx, pos in enumerate(self.velocities):
+            if t < pos.t:
+                t2Idx = idx
+                break
 
+        t1Idx = t2Idx - 1
+        if t2Idx < 0:
+            if extrap:
+                out = self.velocities[-2].lerp(self.velocities[-1], t)
+                return out.LLA # If you really do want it
+            return None # Requested time is after this collect
+        if t1Idx < 0:
+            if extrap:
+                out = self.velocities[0].lerp(self.velocities[1], t)
+                return out.LLA # If you really do want it
+            return None # Requested time is before this collect
+        
+        out = self.velocities[t1Idx].lerp(self.velocities[t2Idx], t)
+        return [out.heading, out.groundSpeed, out.altRate]
+
+    def getPositionENU(self, centerLLA: np.ndarray, t: datetime, extrap: bool=False) -> np.ndarray:
+        LLA = self.getPosition(t, extrap)
+        return np.array(pymap3d.geodetic2enu(*LLA, *centerLLA))
+
+    def getVelocityENU(self, t: datetime, extrap: bool=False) -> np.ndarray:
+        [heading, groundSpeed, altRate] = self.getVelocity(t, extrap)
+        dir = np.deg2rad(heading - 90)
+        dx = np.cos(dir)*groundSpeed
+        dy = np.sin(dir)*groundSpeed
+        dz = altRate
+        return np.array([dx, dy, dz])
