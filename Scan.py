@@ -55,7 +55,9 @@ class Scan():
         targets = []
         for i in range(len(self.targets)):
             tProp = self.settings['tStart'] + timedelta(seconds= self.tStart + self.targetTimes[i])
-            targetLLA = self.targets[i].getPosition(tProp)
+            targetLLA = self.targets[i].getPosition(tProp, True)
+            if targetLLA is None:
+                continue
             targets.append(targetLLA)
         return targets
 
